@@ -31,6 +31,7 @@ Create, edit, visualize, and test-run AI agents & multi-step workflows — entir
 | **Playground** | Live execution of agents (LLM streaming) and workflows (step-by-step SSE) |
 | **Build Validation** | YAML schema, Python AST, and graph connectivity checks |
 | **Dark / Light Mode** | Toggle between themes; preference is persisted in localStorage |
+| **English / Japanese** | English by default; the 🌐 button in the sidebar switches to Japanese and the choice is remembered |
 | **Weekend Saver** | A built-in workflow that really runs: it switches Azure resources off for the weekend and back on, and can be customized with AI steps. See [docs/weekend-saver.md](docs/weekend-saver.md) |
 
 ## Architecture

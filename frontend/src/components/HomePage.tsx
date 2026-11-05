@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from '../i18n/LanguageContext'
 import { listAgents, listWorkflows } from '../api/client'
 
 export default function HomePage() {
+  const { t } = useI18n()
   const [agentCount, setAgentCount] = useState(0)
   const [workflowCount, setWorkflowCount] = useState(0)
 
@@ -17,31 +19,30 @@ export default function HomePage() {
       </div>
 
       <p style={{ color: 'var(--text-secondary)', marginBottom: 32, maxWidth: 680, lineHeight: 1.7, fontSize: 14 }}>
-        自然言語でAIエージェントとワークフローのコードを自動生成。
-        Microsoft Agent Framework の Skills を活用し、対話的にコードを作成・編集・テストできます。
+        {t.home.intro}
       </p>
 
       <div className="grid-home">
         <div className="card">
-          <div className="card-title">🤖 エージェント</div>
+          <div className="card-title">🤖 {t.home.agents}</div>
           <p className="stat-value">{agentCount}</p>
-          <p className="stat-label">作成済みエージェント</p>
+          <p className="stat-label">{t.home.agentsCreated}</p>
         </div>
         <div className="card">
-          <div className="card-title">🔀 ワークフロー</div>
+          <div className="card-title">🔀 {t.home.workflows}</div>
           <p className="stat-value">{workflowCount}</p>
-          <p className="stat-label">作成済みワークフロー</p>
+          <p className="stat-label">{t.home.workflowsCreated}</p>
         </div>
       </div>
 
       <div className="card" style={{ marginTop: 24, maxWidth: 680 }}>
-        <div className="card-title" style={{ marginBottom: 12 }}>アーキテクチャ</div>
+        <div className="card-title" style={{ marginBottom: 12 }}>{t.home.architecture}</div>
         <pre className="code-block">{`
 ┌─────────────────────────────────────────┐
 │          Frontend (React + TS)          │
 │  ┌────────────┐  ┌───────────────────┐  │
-│  │ Agent作成   │  │ Workflow作成       │  │
-│  │ (NL/手動)  │  │ (NL/手動/編集)    │  │
+${t.home.diagramRow1}
+${t.home.diagramRow2}
 │  └─────┬──────┘  └────────┬──────────┘  │
 └────────┼──────────────────┼─────────────┘
          │  REST API        │

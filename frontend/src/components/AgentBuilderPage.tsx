@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useI18n } from '../i18n/LanguageContext'
 import {
   createAgentFromPrompt,
   createAgentFromDefinition,
@@ -21,6 +22,7 @@ interface BuilderMessage {
 }
 
 export default function AgentBuilderPage() {
+  const { t } = useI18n()
   const [tab, setTab] = useState<TabMode>('chat')
   const [agents, setAgents] = useState<{ name: string; description: string; model: string; source_workflow?: string | null }[]>([])
   const [loading, setLoading] = useState(false)
@@ -99,7 +101,7 @@ export default function AgentBuilderPage() {
     setIsCreating(true)
     setBuilderMessages([{
       role: 'system',
-      content: '新しいエージェントを作成します。どんなエージェントを作りたいですか？説明してください。',
+      content: t.agents.newPrompt,
     }])
     setResult(null)
     setSelectedAgent(null)
@@ -135,19 +137,19 @@ export default function AgentBuilderPage() {
       }
       refreshList()
 
-      const action = currentName ? '更新' : '作成'
+      const updated = Boolean(currentName)
       const assistantMsg: BuilderMessage = {
         role: 'assistant',
         content: res.validation.valid
-          ? `✅ エージェント「${res.name}」を${action}しました。\n\n引き続きチャットで修正できます。例：\n• 「もっと丁寧な口調にして」\n• 「ツールを追加して」\n• 「Temperature を 0.3 にして」`
-          : `⚠️ エージェント「${res.name}」を${action}しましたが、バリデーションエラーがあります：\n${res.validation.errors.join('\n')}`,
+          ? t.agents.saved(res.name, updated)
+          : t.agents.savedWithErrors(res.name, updated, res.validation.errors.join('\n')),
         agentResult: res,
       }
       setBuilderMessages(prev => [...prev, assistantMsg])
     } catch (e: any) {
       setBuilderMessages(prev => [...prev, {
         role: 'assistant',
-        content: `❌ エラーが発生しました: ${e.message}`,
+        content: t.common.failed(e.message),
       }])
     } finally {
       setLoading(false)
@@ -160,7 +162,7 @@ export default function AgentBuilderPage() {
     setIsCreating(true)
     setBuilderMessages([{
       role: 'system',
-      content: `エージェント「${selectedAgent.name}」を編集モードで開きました。どのように変更しますか？`,
+      content: t.agents.editOpened(selectedAgent.name),
     }])
     setBuilderInput('')
   }
@@ -199,7 +201,7 @@ export default function AgentBuilderPage() {
   }
 
   const handleDelete = async (name: string) => {
-    if (!confirm(`エージェント "${name}" を削除しますか？`)) return
+    if (!confirm(t.agents.confirmDelete(name))) return
     await deleteAgent(name)
     setSelectedAgent(null)
     setResult(null)
@@ -233,7 +235,7 @@ export default function AgentBuilderPage() {
       newMessages,
       (token) => { fullResponse += token; setStreamBuffer(fullResponse) },
       (content) => { setMessages(prev => [...prev, { role: 'assistant', content }]); setStreamBuffer(''); setStreaming(false) },
-      (error) => { setMessages(prev => [...prev, { role: 'assistant', content: `エラー: ${error}` }]); setStreamBuffer(''); setStreaming(false) },
+      (error) => { setMessages(prev => [...prev, { role: 'assistant', content: t.agents.streamError(String(error)) }]); setStreamBuffer(''); setStreaming(false) },
     )
   }
 
@@ -260,20 +262,20 @@ export default function AgentBuilderPage() {
     <div className="devui-shell">
       {/* ── Top Toolbar ── */}
       <div className="devui-toolbar">
-        <div className="devui-toolbar-title">🤖 エージェント</div>
+        <div className="devui-toolbar-title">🤖 {t.agents.title}</div>
         <div className="devui-tabs tabs" style={{ borderBottom: 'none', marginBottom: 0, flexShrink: 0 }}>
           <button className={`tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>
-            💬 自然言語
+            {t.agents.naturalLanguage}
           </button>
           <button className={`tab ${tab === 'manual' ? 'active' : ''}`} onClick={() => setTab('manual')}>
-            ✏️ 手動
+            {t.agents.manual}
           </button>
         </div>
         <div style={{ flex: 1 }} />
         {tab === 'chat' && (
           <div className="devui-toolbar-actions">
             <button className="btn btn-primary btn-sm" onClick={handleNew}>
-              ＋ 新規作成
+              {t.common.newItem}
             </button>
           </div>
         )}
@@ -284,14 +286,14 @@ export default function AgentBuilderPage() {
         {/* Left: Agent list */}
         <div className="devui-list-panel">
           <div className="devui-list-header">
-            <span className="devui-list-header-title">エージェント</span>
+            <span className="devui-list-header-title">{t.agents.title}</span>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{agents.length}</span>
           </div>
           <div className="devui-list-body">
             {agents.length === 0 ? (
               <div className="devui-empty">
                 <div className="devui-empty-icon">🤖</div>
-                <span>まだなし</span>
+                <span>{t.common.none}</span>
               </div>
             ) : (
               agents.map(a => (
@@ -303,7 +305,7 @@ export default function AgentBuilderPage() {
                   <div className="devui-list-item-name">
                     {a.name}
                     {a.source_workflow && (
-                      <span className="badge badge-workflow" title={`ワークフロー「${a.source_workflow}」から自動生成`}>WF</span>
+                      <span className="badge badge-workflow" title={t.agents.generatedFrom(a.source_workflow)}>WF</span>
                     )}
                   </div>
                   <div className="devui-list-item-desc">{a.description}</div>
@@ -323,24 +325,24 @@ export default function AgentBuilderPage() {
             <div style={{ overflow: 'auto', flex: 1, padding: 20 }}>
               <div style={{ maxWidth: 600 }}>
                 <div className="form-group">
-                  <label className="form-label">名前 (snake_case)</label>
+                  <label className="form-label">{t.agents.formName}</label>
                   <input className="form-input" placeholder="customer_support_agent" value={manualForm.name}
                     onChange={e => setManualForm({ ...manualForm, name: e.target.value })} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">説明</label>
-                  <input className="form-input" placeholder="顧客サポート用のAIエージェント" value={manualForm.description}
+                  <label className="form-label">{t.agents.formDescription}</label>
+                  <input className="form-input" placeholder={t.agents.formDescriptionPlaceholder} value={manualForm.description}
                     onChange={e => setManualForm({ ...manualForm, description: e.target.value })} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">インストラクション (システムプロンプト)</label>
-                  <textarea className="form-textarea" style={{ minHeight: 180 }} placeholder="あなたはカスタマーサポートの専門家です。..."
+                  <label className="form-label">{t.agents.formInstructions}</label>
+                  <textarea className="form-textarea" style={{ minHeight: 180 }} placeholder={t.agents.formInstructionsPlaceholder}
                     value={manualForm.instructions}
                     onChange={e => setManualForm({ ...manualForm, instructions: e.target.value })} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="form-group">
-                    <label className="form-label">モデル</label>
+                    <label className="form-label">{t.agents.formModel}</label>
                     <select className="form-select" value={manualForm.model}
                       onChange={e => setManualForm({ ...manualForm, model: e.target.value })}>
                       <option value="gpt-4o">gpt-4o</option>
@@ -355,7 +357,7 @@ export default function AgentBuilderPage() {
                   </div>
                 </div>
                 <button className="btn btn-primary" onClick={handleManualCreate} disabled={loading || !manualForm.name || !manualForm.instructions}>
-                  {loading ? <span className="spinner" /> : 'エージェント作成'}
+                  {loading ? <span className="spinner" /> : t.agents.create}
                 </button>
               </div>
             </div>
@@ -365,18 +367,18 @@ export default function AgentBuilderPage() {
           {showBuilderChat && (
             <div className="builder-chat-panel" style={{ flex: `0 0 ${chatPanelPct}%`, maxHeight: `${chatPanelPct}%`, minHeight: 0, borderBottom: '2px solid rgba(99,102,241,0.3)' }}>
               <div className="builder-chat-header">
-                <span className="builder-chat-header-title">💬 エージェント作成チャット</span>
+                <span className="builder-chat-header-title">{t.agents.chatTitle}</span>
                 <button className="btn btn-secondary btn-sm" onClick={() => setIsCreating(false)}>
-                  ✕ 閉じる
+                  {t.common.close}
                 </button>
               </div>
               <div className="builder-chat-messages">
                 {builderMessages.map((msg, i) => (
                   <div key={i} className={`builder-msg builder-msg-${msg.role}`}>
                     <div className="builder-msg-role">
-                      {msg.role === 'user' && '👤 あなた'}
+                      {msg.role === 'user' && t.common.you}
                       {msg.role === 'assistant' && '🤖 AI'}
-                      {msg.role === 'system' && '🔧 システム'}
+                      {msg.role === 'system' && t.common.system}
                     </div>
                     <div className="builder-msg-content">{msg.content}</div>
                   </div>
@@ -385,7 +387,7 @@ export default function AgentBuilderPage() {
                   <div className="builder-msg builder-msg-assistant">
                     <div className="builder-msg-role">🤖 AI</div>
                     <div className="builder-msg-content">
-                      <span className="playground-thinking">生成中...</span>
+                      <span className="playground-thinking">{t.common.generating}</span>
                     </div>
                   </div>
                 )}
@@ -395,7 +397,7 @@ export default function AgentBuilderPage() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                   <textarea
                     className="form-input chat-textarea"
-                    placeholder={result?.name ? '修正内容を入力... (例: 「もっと丁寧な口調にして」)' : 'エージェントの説明を入力...'}
+                    placeholder={result?.name ? t.agents.editPlaceholder : t.agents.describePlaceholder}
                     value={builderInput}
                     onChange={e => setBuilderInput(e.target.value)}
                     onKeyDown={e => {
@@ -414,10 +416,10 @@ export default function AgentBuilderPage() {
                     disabled={loading || !builderInput.trim()}
                     style={{ alignSelf: 'flex-end', marginBottom: 2 }}
                   >
-                    {loading ? <span className="spinner" /> : '送信'}
+                    {loading ? <span className="spinner" /> : t.common.send}
                   </button>
                 </div>
-                <div className="chat-textarea-hint">Ctrl+Enter で送信</div>
+                <div className="chat-textarea-hint">{t.common.sendHint}</div>
               </div>
             </div>
           )}
@@ -431,9 +433,9 @@ export default function AgentBuilderPage() {
           {showEmpty && (
             <div className="devui-empty">
               <div className="devui-empty-icon">🤖</div>
-              <span>エージェントを作成または選択してください</span>
+              <span>{t.agents.emptyTitle}</span>
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                「＋ 新規作成」ボタンか、左のリストからエージェントを選んでください
+                {t.agents.emptyHint}
               </span>
             </div>
           )}
@@ -441,7 +443,7 @@ export default function AgentBuilderPage() {
           {/* Placeholder below chat when no agent exists yet */}
           {showBuilderChat && !hasAgent && (
             <div className="devui-center-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>チャットでエージェントの説明を入力してください</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t.agents.chatHint}</span>
             </div>
           )}
 
@@ -450,7 +452,7 @@ export default function AgentBuilderPage() {
             <div className="devui-center-full">
               <div className="devui-center-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>作成結果: {result.name}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{t.agents.result}: {result.name}</span>
                   <span className={`badge ${result.validation.valid ? 'badge-success' : 'badge-error'}`}>
                     {result.validation.valid ? '✓ OK' : '✗ Error'}
                   </span>
@@ -459,7 +461,7 @@ export default function AgentBuilderPage() {
                   <ResultTabButtons />
                   {!isCreating && (
                     <button className="btn btn-accent btn-sm" onClick={handleEditSelectedAgent}>
-                      ✏️ チャットで編集
+                      {t.common.editInChat}
                     </button>
                   )}
                 </div>
@@ -491,7 +493,7 @@ export default function AgentBuilderPage() {
                   <ResultTabButtons />
                   {!isCreating && (
                     <button className="btn btn-accent btn-sm" onClick={handleEditSelectedAgent}>
-                      ✏️ チャットで編集
+                      {t.common.editInChat}
                     </button>
                   )}
                   <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedAgent.name)}>🗑️</button>
@@ -512,7 +514,7 @@ export default function AgentBuilderPage() {
         <div className="devui-right">
           <div className="devui-right-header">
             <span className="devui-right-header-title">
-              🎮 {activeName ? activeName : 'プレイグラウンド'}
+              🎮 {activeName ? activeName : t.agents.playground}
             </span>
             {activeName && messages.length > 0 && (
               <button className="btn btn-secondary btn-sm" onClick={() => { setMessages([]); setStreamBuffer('') }}>
@@ -537,7 +539,7 @@ export default function AgentBuilderPage() {
               <div className="devui-messages">
                 {messages.length === 0 && !streaming && (
                   <div className="devui-empty">
-                    <span style={{ fontSize: 12 }}>メッセージを送信してテスト</span>
+                    <span style={{ fontSize: 12 }}>{t.agents.testHint}</span>
                   </div>
                 )}
                 {messages.map((msg, i) => (
@@ -561,7 +563,7 @@ export default function AgentBuilderPage() {
                   <div className="playground-msg playground-msg-assistant">
                     <div className="playground-msg-role">🤖 {activeName}</div>
                     <div className="playground-msg-content">
-                      <span className="playground-thinking">考え中...</span>
+                      <span className="playground-thinking">{t.agents.thinking}</span>
                     </div>
                   </div>
                 )}
@@ -573,7 +575,7 @@ export default function AgentBuilderPage() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                   <textarea
                     className="form-input chat-textarea"
-                    placeholder="メッセージを入力..."
+                    placeholder={t.agents.messagePlaceholder}
                     value={chatInput}
                     onChange={e => setChatInput(e.target.value)}
                     onKeyDown={e => {
@@ -592,16 +594,16 @@ export default function AgentBuilderPage() {
                     disabled={streaming || !chatInput.trim()}
                     style={{ alignSelf: 'flex-end', marginBottom: 2 }}
                   >
-                    {streaming ? <span className="spinner" /> : '送信'}
+                    {streaming ? <span className="spinner" /> : t.common.send}
                   </button>
                 </div>
-                <div className="chat-textarea-hint">Ctrl+Enter で送信</div>
+                <div className="chat-textarea-hint">{t.common.sendHint}</div>
               </div>
             </>
           ) : (
             <div className="devui-empty">
               <div className="devui-empty-icon">💬</div>
-              <span>エージェントを選択してチャット</span>
+              <span>{t.agents.selectToChat}</span>
             </div>
           )}
         </div>

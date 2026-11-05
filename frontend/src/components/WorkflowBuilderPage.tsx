@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useI18n } from '../i18n/LanguageContext'
 import {
   ReactFlow,
   Background,
@@ -52,6 +53,7 @@ const WEEKEND_SAVER = 'weekend_saver'
 
 export default function WorkflowBuilderPage() {
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [workflows, setWorkflows] = useState<{ name: string; description: string; executors_count: number; edges_count: number }[]>([])
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<WorkflowCreateResponse | null>(null)
@@ -122,7 +124,7 @@ export default function WorkflowBuilderPage() {
     setIsCreating(true)
     setBuilderMessages([{
       role: 'system',
-      content: '新しいワークフローを作成します。どんなワークフローを作りたいですか？説明してください。',
+      content: t.workflows.newPrompt,
     }])
     setResult(null)
     setSelectedWf(null)
@@ -156,19 +158,19 @@ export default function WorkflowBuilderPage() {
       resetExecution()
       refreshList()
 
-      const action = currentName ? '更新' : '作成'
+      const updated = Boolean(currentName)
       const assistantMsg: BuilderMessage = {
         role: 'assistant',
         content: res.validation.valid
-          ? `✅ ワークフロー「${res.name}」を${action}しました。\n\n引き続きチャットで修正できます。例：\n• 「ログ記録ステップを追加して」\n• 「条件分岐を変更して」\n• 「新しいノードを追加して」`
-          : `⚠️ ワークフロー「${res.name}」を${action}しましたが、バリデーションエラーがあります：\n${res.validation.errors.join('\n')}`,
+          ? t.workflows.saved(res.name, updated)
+          : t.workflows.savedWithErrors(res.name, updated, res.validation.errors.join('\n')),
         workflowResult: res,
       }
       setBuilderMessages(prev => [...prev, assistantMsg])
     } catch (e: any) {
       setBuilderMessages(prev => [...prev, {
         role: 'assistant',
-        content: `❌ エラーが発生しました: ${e.message}`,
+        content: t.common.failed(e.message),
       }])
     } finally {
       setLoading(false)
@@ -182,7 +184,7 @@ export default function WorkflowBuilderPage() {
     setIsCreating(true)
     setBuilderMessages([{
       role: 'system',
-      content: `ワークフロー「${name}」を編集モードで開きました。どのように変更しますか？`,
+      content: t.workflows.editOpened(name),
     }])
     setBuilderInput('')
   }
@@ -203,7 +205,7 @@ export default function WorkflowBuilderPage() {
   }
 
   const handleDelete = async (name: string) => {
-    if (!confirm(`ワークフロー "${name}" を削除しますか？`)) return
+    if (!confirm(t.workflows.confirmDelete(name))) return
     await deleteWorkflow(name)
     setSelectedWf(null)
     setResult(null)
@@ -250,13 +252,13 @@ export default function WorkflowBuilderPage() {
         case 'edge_active': {
           const edgeKey = `${event.source}->${event.target}`
           setActiveEdges(prev => ({ ...prev, [edgeKey]: 'flowing' }))
-          const conditionText = event.condition ? ` (条件: ${event.condition})` : ''
+          const conditionText = event.condition ? t.workflows.condition(event.condition) : ''
           setLogs(prev => [...prev, { id: prev.length, type: 'edge_active', source: event.source, target: event.target, condition: conditionText, timestamp }])
           setTimeout(() => { setActiveEdges(prev => ({ ...prev, [edgeKey]: 'done' })) }, 800)
           break
         }
         case 'edge_skipped': {
-          setLogs(prev => [...prev, { id: prev.length, type: 'edge_skipped', source: event.source, target: event.target, condition: event.condition ? ` (条件: ${event.condition})` : '', timestamp }])
+          setLogs(prev => [...prev, { id: prev.length, type: 'edge_skipped', source: event.source, target: event.target, condition: event.condition ? t.workflows.condition(event.condition) : '', timestamp }])
           break
         }
         case 'done':
@@ -275,11 +277,11 @@ export default function WorkflowBuilderPage() {
     <div className="devui-shell">
       {/* ── Top Toolbar ── */}
       <div className="devui-toolbar">
-        <div className="devui-toolbar-title">🔀 ワークフロー</div>
+        <div className="devui-toolbar-title">🔀 {t.workflows.title}</div>
         <div style={{ flex: 1 }} />
         <div className="devui-toolbar-actions">
           <button className="btn btn-primary btn-sm" onClick={handleNew}>
-            ＋ 新規作成
+            {t.common.newItem}
           </button>
         </div>
       </div>
@@ -289,14 +291,14 @@ export default function WorkflowBuilderPage() {
         {/* Left: Workflow list */}
         <div className="devui-list-panel">
           <div className="devui-list-header">
-            <span className="devui-list-header-title">ワークフロー</span>
+            <span className="devui-list-header-title">{t.workflows.title}</span>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{workflows.length}</span>
           </div>
           <div className="devui-list-body">
             {workflows.length === 0 ? (
               <div className="devui-empty">
                 <div className="devui-empty-icon">🔀</div>
-                <span>まだなし</span>
+                <span>{t.common.none}</span>
               </div>
             ) : (
               workflows.map(w => (
@@ -320,18 +322,18 @@ export default function WorkflowBuilderPage() {
           {isCreating && (
             <div className="builder-chat-panel" style={{ flex: `0 0 ${chatPanelPct}%`, maxHeight: `${chatPanelPct}%`, minHeight: 0, borderBottom: '2px solid rgba(99,102,241,0.3)' }}>
               <div className="builder-chat-header">
-                <span className="builder-chat-header-title">💬 ワークフロー作成チャット</span>
+                <span className="builder-chat-header-title">{t.workflows.chatTitle}</span>
                 <button className="btn btn-secondary btn-sm" onClick={() => setIsCreating(false)}>
-                  ✕ 閉じる
+                  {t.common.close}
                 </button>
               </div>
               <div className="builder-chat-messages">
                 {builderMessages.map((msg, i) => (
                   <div key={i} className={`builder-msg builder-msg-${msg.role}`}>
                     <div className="builder-msg-role">
-                      {msg.role === 'user' && '👤 あなた'}
+                      {msg.role === 'user' && t.common.you}
                       {msg.role === 'assistant' && '🤖 AI'}
-                      {msg.role === 'system' && '🔧 システム'}
+                      {msg.role === 'system' && t.common.system}
                     </div>
                     <div className="builder-msg-content">{msg.content}</div>
                   </div>
@@ -340,7 +342,7 @@ export default function WorkflowBuilderPage() {
                   <div className="builder-msg builder-msg-assistant">
                     <div className="builder-msg-role">🤖 AI</div>
                     <div className="builder-msg-content">
-                      <span className="playground-thinking">生成中...</span>
+                      <span className="playground-thinking">{t.common.generating}</span>
                     </div>
                   </div>
                 )}
@@ -350,7 +352,7 @@ export default function WorkflowBuilderPage() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                   <textarea
                     className="form-input chat-textarea"
-                    placeholder={result?.name || selectedWf?.name ? '修正内容を入力... (例: 「ログ記録ステップを追加して」)' : 'ワークフローの説明を入力...'}
+                    placeholder={result?.name || selectedWf?.name ? t.workflows.editPlaceholder : t.workflows.describePlaceholder}
                     value={builderInput}
                     onChange={e => setBuilderInput(e.target.value)}
                     onKeyDown={e => {
@@ -369,10 +371,10 @@ export default function WorkflowBuilderPage() {
                     disabled={loading || !builderInput.trim()}
                     style={{ alignSelf: 'flex-end', marginBottom: 2 }}
                   >
-                    {loading ? <span className="spinner" /> : '送信'}
+                    {loading ? <span className="spinner" /> : t.common.send}
                   </button>
                 </div>
-                <div className="chat-textarea-hint">Ctrl+Enter で送信</div>
+                <div className="chat-textarea-hint">{t.common.sendHint}</div>
               </div>
             </div>
           )}
@@ -397,7 +399,7 @@ export default function WorkflowBuilderPage() {
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <div className="devui-tabs tabs">
                     <button className={`tab ${viewTab === 'graph' ? 'active' : ''}`} onClick={() => setViewTab('graph')}>
-                      📊 グラフ
+                      {t.workflows.graph}
                     </button>
                     <button className={`tab ${viewTab === 'yaml' ? 'active' : ''}`} onClick={() => setViewTab('yaml')}>
                       YAML
@@ -408,7 +410,7 @@ export default function WorkflowBuilderPage() {
                   </div>
                   {!isCreating && (
                     <button className="btn btn-accent btn-sm" onClick={handleEditSelectedWf}>
-                      ✏️ チャットで編集
+                      {t.common.editInChat}
                     </button>
                   )}
                   <button className="btn btn-danger btn-sm" onClick={() => handleDelete(activeName)}>
@@ -445,14 +447,14 @@ export default function WorkflowBuilderPage() {
           ) : !isCreating ? (
             <div className="devui-empty">
               <div className="devui-empty-icon">📊</div>
-              <span>ワークフローを作成または選択してください</span>
+              <span>{t.workflows.emptyTitle}</span>
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                「＋ 新規作成」ボタンか、左のリストからワークフローを選んでください
+                {t.workflows.emptyHint}
               </span>
             </div>
           ) : (
             <div className="devui-center-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>チャットでワークフローの説明を入力してください</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t.workflows.chatHint}</span>
             </div>
           )}
         </div>
@@ -460,9 +462,9 @@ export default function WorkflowBuilderPage() {
         {/* Right: Playground (execution) */}
         <div className="devui-right">
           <div className="devui-right-header">
-            <span className="devui-right-header-title">🎮 プレイグラウンド</span>
+            <span className="devui-right-header-title">{t.workflows.playground}</span>
             {execStatus !== 'idle' && (
-              <button className="btn btn-secondary btn-sm" onClick={resetExecution}>リセット</button>
+              <button className="btn btn-secondary btn-sm" onClick={resetExecution}>{t.workflows.reset}</button>
             )}
           </div>
 
@@ -473,7 +475,7 @@ export default function WorkflowBuilderPage() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                   <textarea
                     className="form-input chat-textarea"
-                    placeholder="入力メッセージ..."
+                    placeholder={t.workflows.inputPlaceholder}
                     value={runInput}
                     onChange={e => setRunInput(e.target.value)}
                     onKeyDown={e => {
@@ -492,19 +494,19 @@ export default function WorkflowBuilderPage() {
                     disabled={execStatus === 'running'}
                     style={{ alignSelf: 'flex-end', marginBottom: 2 }}
                   >
-                    {execStatus === 'running' ? <><span className="spinner" /> 実行中</> : '▶ 実行'}
+                    {execStatus === 'running' ? <><span className="spinner" />{t.workflows.running}</> : t.workflows.run}
                   </button>
                 </div>
-                <div className="chat-textarea-hint">Ctrl+Enter で送信</div>
+                <div className="chat-textarea-hint">{t.common.sendHint}</div>
               </div>
 
               {/* Status */}
               {execStatus !== 'idle' && (
                 <div style={{ padding: '0 12px', flexShrink: 0, marginTop: 8 }}>
                   <div className={`playground-wf-status playground-wf-status-${execStatus}`}>
-                    {execStatus === 'running' && '⏳ 実行中...'}
-                    {execStatus === 'done' && '✅ 完了'}
-                    {execStatus === 'error' && '❌ エラー'}
+                    {execStatus === 'running' && t.workflows.statusRunning}
+                    {execStatus === 'done' && t.workflows.statusDone}
+                    {execStatus === 'error' && t.workflows.statusError}
                   </div>
                 </div>
               )}
@@ -513,40 +515,40 @@ export default function WorkflowBuilderPage() {
               <div className="devui-right-body">
                 {logs.length === 0 && execStatus === 'idle' && (
                   <div className="devui-empty">
-                    <span style={{ fontSize: 12 }}>▶ 実行ボタンでワークフローをテスト</span>
+                    <span style={{ fontSize: 12 }}>{t.workflows.runHint}</span>
                   </div>
                 )}
                 {logs.length > 0 && (
                   <div className="devui-exec-section">
-                    <div className="devui-exec-section-title">📋 実行ログ</div>
+                    <div className="devui-exec-section-title">{t.workflows.logTitle}</div>
                     <div className="wf-log-list">
                       {logs.map(log => (
                         <div key={log.id} className={`wf-log-item wf-log-${log.type} wf-log-clickable`} onClick={() => setSelectedLog(log)}>
                           <div className="wf-log-badge">
-                            {log.type === 'start' && '🟢 開始'}
-                            {log.type === 'node_enter' && '⏩ 実行中'}
-                            {log.type === 'node_complete' && '✅ 完了'}
-                            {log.type === 'edge_active' && '→ 転送'}
-                            {log.type === 'edge_skipped' && '⊘ スキップ'}
-                            {log.type === 'done' && '🏁 終了'}
-                            {log.type === 'error' && '❌ エラー'}
+                            {log.type === 'start' && t.workflows.logStart}
+                            {log.type === 'node_enter' && t.workflows.logNodeEnter}
+                            {log.type === 'node_complete' && t.workflows.logNodeComplete}
+                            {log.type === 'edge_active' && t.workflows.logEdgeActive}
+                            {log.type === 'edge_skipped' && t.workflows.logEdgeSkipped}
+                            {log.type === 'done' && t.workflows.logDone}
+                            {log.type === 'error' && t.workflows.logError}
                           </div>
                           {log.node && <div className="wf-log-node">{log.node}</div>}
                           {log.type === 'edge_active' && <div className="wf-log-edge">{log.source} → {log.target}{log.condition || ''}</div>}
                           {log.type === 'edge_skipped' && <div className="wf-log-edge" style={{opacity: 0.5, textDecoration: 'line-through'}}>{log.source} → {log.target}{log.condition || ''}</div>}
                           {log.input && (
                             <div className="wf-log-data">
-                              <span className="wf-log-data-label">入力:</span>
+                              <span className="wf-log-data-label">{t.workflows.input}</span>
                               {log.input.length > 100 ? log.input.slice(0, 100) + '...' : log.input}
                             </div>
                           )}
                           {log.output && (
                             <div className="wf-log-data">
-                              <span className="wf-log-data-label">出力:</span>
+                              <span className="wf-log-data-label">{t.workflows.output}</span>
                               {log.output.length > 150 ? log.output.slice(0, 150) + '...' : log.output}
                             </div>
                           )}
-                          <div className="wf-log-tap-hint">タップで詳細</div>
+                          <div className="wf-log-tap-hint">{t.workflows.tapForDetails}</div>
                         </div>
                       ))}
                       <div ref={logsEndRef} />
@@ -558,7 +560,7 @@ export default function WorkflowBuilderPage() {
           ) : (
             <div className="devui-empty">
               <div className="devui-empty-icon">🎮</div>
-              <span>ワークフローを選択して実行</span>
+              <span>{t.workflows.selectToRun}</span>
             </div>
           )}
         </div>
@@ -570,13 +572,13 @@ export default function WorkflowBuilderPage() {
           <div className="log-popup" onClick={e => e.stopPropagation()}>
             <div className="log-popup-header">
               <span className="log-popup-title">
-                {selectedLog.type === 'start' && '🟢 開始'}
-                {selectedLog.type === 'node_enter' && '⏩ 実行中'}
-                {selectedLog.type === 'node_complete' && '✅ 完了'}
-                {selectedLog.type === 'edge_active' && '→ 転送'}
-                {selectedLog.type === 'edge_skipped' && '⊘ スキップ'}
-                {selectedLog.type === 'done' && '🏁 終了'}
-                {selectedLog.type === 'error' && '❌ エラー'}
+                {selectedLog.type === 'start' && t.workflows.logStart}
+                {selectedLog.type === 'node_enter' && t.workflows.logNodeEnter}
+                {selectedLog.type === 'node_complete' && t.workflows.logNodeComplete}
+                {selectedLog.type === 'edge_active' && t.workflows.logEdgeActive}
+                {selectedLog.type === 'edge_skipped' && t.workflows.logEdgeSkipped}
+                {selectedLog.type === 'done' && t.workflows.logDone}
+                {selectedLog.type === 'error' && t.workflows.logError}
                 {selectedLog.node && ` — ${selectedLog.node}`}
               </span>
               <button className="btn btn-secondary btn-sm" onClick={() => setSelectedLog(null)}>✕</button>
@@ -584,23 +586,23 @@ export default function WorkflowBuilderPage() {
             <div className="log-popup-body">
               <table className="log-popup-table">
                 <tbody>
-                  <tr><td className="log-popup-label">タイプ</td><td>{selectedLog.type}</td></tr>
-                  {selectedLog.node && <tr><td className="log-popup-label">ノード</td><td>{selectedLog.node}</td></tr>}
-                  {selectedLog.source && <tr><td className="log-popup-label">ソース</td><td>{selectedLog.source}</td></tr>}
-                  {selectedLog.target && <tr><td className="log-popup-label">ターゲット</td><td>{selectedLog.target}</td></tr>}
-                  {selectedLog.condition && <tr><td className="log-popup-label">条件</td><td>{selectedLog.condition}</td></tr>}
-                  <tr><td className="log-popup-label">タイムスタンプ</td><td>{new Date(selectedLog.timestamp).toLocaleTimeString()}</td></tr>
+                  <tr><td className="log-popup-label">{t.workflows.detailType}</td><td>{selectedLog.type}</td></tr>
+                  {selectedLog.node && <tr><td className="log-popup-label">{t.workflows.detailNode}</td><td>{selectedLog.node}</td></tr>}
+                  {selectedLog.source && <tr><td className="log-popup-label">{t.workflows.detailSource}</td><td>{selectedLog.source}</td></tr>}
+                  {selectedLog.target && <tr><td className="log-popup-label">{t.workflows.detailTarget}</td><td>{selectedLog.target}</td></tr>}
+                  {selectedLog.condition && <tr><td className="log-popup-label">{t.workflows.detailCondition}</td><td>{selectedLog.condition}</td></tr>}
+                  <tr><td className="log-popup-label">{t.workflows.detailTimestamp}</td><td>{new Date(selectedLog.timestamp).toLocaleTimeString()}</td></tr>
                 </tbody>
               </table>
               {selectedLog.input && (
                 <div className="log-popup-section">
-                  <div className="log-popup-section-title">📥 入力</div>
+                  <div className="log-popup-section-title">{t.workflows.detailInput}</div>
                   <pre className="log-popup-pre">{selectedLog.input}</pre>
                 </div>
               )}
               {selectedLog.output && (
                 <div className="log-popup-section">
-                  <div className="log-popup-section-title">📤 出力</div>
+                  <div className="log-popup-section-title">{t.workflows.detailOutput}</div>
                   <pre className="log-popup-pre">{selectedLog.output}</pre>
                 </div>
               )}
@@ -626,6 +628,7 @@ function AnimatedWorkflowGraph({
   activeEdges: Record<string, 'flowing' | 'done' | 'idle'>
   nodeOutputs: Record<string, string>
 }) {
+  const { t } = useI18n()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([])
 
@@ -741,7 +744,7 @@ function AnimatedWorkflowGraph({
   }, [flowNodes, flowEdges, setNodes, setEdges])
 
   if (!nodes.length) {
-    return <div className="empty-state"><p>グラフデータがありません</p></div>
+    return <div className="empty-state"><p>{t.workflows.noGraph}</p></div>
   }
 
   return (

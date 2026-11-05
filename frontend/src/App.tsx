@@ -4,6 +4,7 @@ import AgentBuilderPage from './components/AgentBuilderPage'
 import WorkflowBuilderPage from './components/WorkflowBuilderPage'
 import HomePage from './components/HomePage'
 import WeekendSaverPage from './components/weekend-saver/WeekendSaverPage'
+import { useI18n } from './i18n/LanguageContext'
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -13,6 +14,7 @@ export default function App() {
     return saved === 'dark'
   })
   const location = useLocation()
+  const { t, toggleLanguage } = useI18n()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
@@ -53,19 +55,19 @@ export default function App() {
           )}
         </div>
 
-        {!sidebarCollapsed && <div className="sidebar-section">ナビゲーション</div>}
+        {!sidebarCollapsed && <div className="sidebar-section">{t.nav.section}</div>}
 
         <NavLink to="/" end className={navLinkClass} onClick={closeSidebar}>
           <span className="sidebar-link-icon">🏠</span>
-          {!sidebarCollapsed && 'ホーム'}
+          {!sidebarCollapsed && t.nav.home}
         </NavLink>
         <NavLink to="/agents" className={navLinkClass} onClick={closeSidebar}>
           <span className="sidebar-link-icon">🤖</span>
-          {!sidebarCollapsed && 'エージェント'}
+          {!sidebarCollapsed && t.nav.agents}
         </NavLink>
         <NavLink to="/workflows" className={navLinkClass} onClick={closeSidebar}>
           <span className="sidebar-link-icon">🔀</span>
-          {!sidebarCollapsed && 'ワークフロー'}
+          {!sidebarCollapsed && t.nav.workflows}
         </NavLink>
         <NavLink to="/weekend-saver" className={navLinkClass} onClick={closeSidebar}>
           <span className="sidebar-link-icon">🌙</span>
@@ -75,16 +77,23 @@ export default function App() {
         <div style={{ flex: 1 }} />
         <button
           className="sidebar-theme-btn"
+          onClick={toggleLanguage}
+          title={t.nav.switchLanguageTitle}
+        >
+          🌐{!sidebarCollapsed && ` ${t.nav.switchLanguage}`}
+        </button>
+        <button
+          className="sidebar-theme-btn"
           onClick={() => setDarkMode(prev => !prev)}
-          title={darkMode ? 'ライトモードに切替' : 'ダークモードに切替'}
+          title={darkMode ? t.nav.toLight : t.nav.toDark}
         >
           {darkMode ? '☀️' : '🌙'}
-          {!sidebarCollapsed && (darkMode ? ' ライト' : ' ダーク')}
+          {!sidebarCollapsed && (darkMode ? t.nav.light : t.nav.dark)}
         </button>
         <button
           className="sidebar-collapse-btn"
           onClick={() => setSidebarCollapsed(prev => !prev)}
-          title={sidebarCollapsed ? 'サイドバーを開く' : 'サイドバーを閉じる'}
+          title={sidebarCollapsed ? t.nav.openSidebar : t.nav.closeSidebar}
         >
           {sidebarCollapsed ? '»' : '«'}
         </button>
