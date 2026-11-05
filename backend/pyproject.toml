@@ -1,0 +1,26 @@
+# Tool settings only: the backend is run from this folder, not installed as a package.
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["live: hits real Azure resources; opt in with -m live"]
+addopts = "-m 'not live'"
+
+[tool.coverage.run]
+source = ["weekend_saver", "weekend_saver_host"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# The original builder modules keep their own style
+extend-exclude = ["main.py", "orchestrator.py", "llm_client.py", "config.py", "models.py", "skills", "generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]

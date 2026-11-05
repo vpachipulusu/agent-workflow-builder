@@ -1,0 +1,24 @@
+# Core
+fastapi>=0.135,<1
+uvicorn[standard]>=0.42,<1
+pydantic>=2.12,<3
+python-dotenv>=1.0,<2
+pyyaml>=6.0,<7
+
+# Azure OpenAI
+openai>=2.20,<3
+azure-identity>=1.20,<2
+
+# Weekend Saver workflow (real Agent Framework runs against Azure)
+agent-framework-core>=1.13,<2
+azure-mgmt-compute>=33.0
+azure-mgmt-containerservice>=31.0
+azure-mgmt-web>=7.3
+azure-mgmt-network>=27.0
+azure-mgmt-postgresqlflexibleservers>=1.0
+# Beta-only package: keep it inside the series the handlers were written against
+azure-mgmt-mysqlflexibleservers>=1.1.0b3,<2
+azure-mgmt-resourcegraph>=8.0.1
+
+# HTTP client (used by test_api.py)
+httpx>=0.28,<1
