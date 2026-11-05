@@ -146,7 +146,10 @@ Gateway, PostgreSQL and MySQL flexible servers) for the weekend and starts them 
 as the person signed in with `az login`.
 
 - Open the **Weekend Saver** page to pick resources, do a dry run, disable or enable
-  with an approval step, and set a weekly schedule.
+  with an approval step, and set a weekly schedule. Resources are picked by drilling
+  down from subscription to resource group, each level loaded when you open it.
+- The workflow records every change it makes, so the page shows what it has switched
+  off, the last change of each resource, and each resource's history.
 - Customize it in plain words or as JSON: add AI steps that comment on a run, or AI
   gates that stop a disable run before anything changes. The six built-in steps
   cannot be removed or bypassed, and a model problem can never keep resources off.

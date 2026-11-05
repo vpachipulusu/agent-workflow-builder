@@ -18,7 +18,8 @@ from weekend_saver.dashboard.demo import (
 from weekend_saver.dashboard.server import build_services, serve
 from weekend_saver.errors import ConfigError
 from weekend_saver.files import default_data_dir, ensure_private_dir
-from weekend_saver.models import Action, PowerState
+from weekend_saver.models import Action, PowerState, RunRequest
+from weekend_saver.runner import run_to_completion
 
 
 async def test_demo_handler_moves_resources_between_states():
@@ -51,6 +52,23 @@ async def test_demo_catalogue_is_consistent():
         assert target.resource_type == resource.resource_type
         assert (await handlers[target.resource_type].get_status(target)).tags == resource.tags
     assert {spec.resource_id for spec in DEMO_SELECTION} <= {r.resource_id for r in discovered}
+
+
+async def test_a_run_started_by_the_services_adds_to_their_activity_record(tmp_path, monkeypatch):
+    instant = DemoHandler(read_delay_seconds=0, change_delay_seconds=0)
+    monkeypatch.setattr(server, "demo_handlers", lambda: demo_handlers(instant))
+    monkeypatch.setattr(server, "DEMO_VERIFY_INTERVAL_SECONDS", 0)
+    services = build_services(data_dir=tmp_path, demo=True)
+    request = RunRequest(Action.DISABLE, DEMO_SELECTION[:1], auto_approve=True)
+
+    async def must_not_ask(_) -> bool:
+        raise AssertionError("an approved run asked for approval")
+
+    await run_to_completion(services.workflow_factory(request), request, must_not_ask)
+
+    assert [(c.name, c.action) for c in services.activity.recent()] == [
+        ("shop-web-dev", "disable")
+    ]
 
 
 def test_demo_services_use_a_throwaway_folder_and_a_seeded_selection(tmp_path):

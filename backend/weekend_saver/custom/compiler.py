@@ -7,6 +7,7 @@ from typing import Any
 
 from agent_framework import CheckpointStorage, Executor, Workflow, WorkflowBuilder
 
+from weekend_saver.activity import ActivityLog
 from weekend_saver.custom.catalog import CORE_BY_ID
 from weekend_saver.custom.definition import FUNCTION, StepDef, WorkflowDef
 from weekend_saver.custom.steps import (
@@ -62,17 +63,21 @@ def compile_workflow(
     model_timeout_seconds: float = MODEL_TIMEOUT_SECONDS,
     verify_interval_seconds: float | None = None,
     notes: tuple[StepNote, ...] = (),
+    activity: ActivityLog | None = None,
 ) -> Workflow:
     """Build the workflow a definition describes; raises DefinitionError if it is invalid.
 
     `verify_interval_seconds` replaces the default wait between checks when the
     definition does not set one. `notes` are added to every report of this workflow.
+    With `activity`, every change a run makes is added to that record.
     """
     errors = validate(definition)
     if errors:
         raise DefinitionError(errors)
 
-    core = _CoreOptions(handlers, state_store, notifier, clock, verify_interval_seconds, notes)
+    core = _CoreOptions(
+        handlers, state_store, notifier, clock, verify_interval_seconds, notes, activity
+    )
     steps = _core_steps(definition, core)
     for step in definition.steps:
         if not step.is_core:
@@ -99,6 +104,7 @@ class _CoreOptions:
     clock: Callable[[], datetime]
     verify_interval_seconds: float | None
     notes: tuple[StepNote, ...]
+    activity: ActivityLog | None = None
 
 
 def _core_steps(definition: WorkflowDef, options: _CoreOptions) -> dict[str, Executor]:
@@ -133,6 +139,8 @@ def _core_steps(definition: WorkflowDef, options: _CoreOptions) -> dict[str, Exe
             interval_seconds=setting(
                 VERIFY_ID, "interval_seconds", options.verify_interval_seconds
             ),
+            activity=options.activity,
+            clock=options.clock,
             routes=routes[VERIFY_ID],
         ),
         REPORT_ID: Report(

@@ -373,12 +373,129 @@
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  margin-bottom: 14px;
+  margin: 10px 0 14px;
+  padding: 6px 10px;
 }
-.ws-picker-list th {
-  position: sticky;
-  top: 0;
-  background: var(--bg-elevated);
+.ws-picker-tools {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.ws-picker-tools .ws-filter {
+  flex: 1 1 240px;
+  width: auto;
+  margin-top: 0;
+}
+.ws-picker-tools .ws-check {
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Drill-down: subscriptions, their groups, their resources */
+.ws-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ws-tree-children {
+  margin-left: 11px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+.ws-tree-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 6px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-tree-row:hover {
+  background: var(--bg-input);
+}
+.ws-tree-chevron {
+  flex-shrink: 0;
+  width: 12px;
+  color: var(--text-muted);
+}
+.ws-tree-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ws-tree-holds {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.ws-tree-row .ws-flag {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.ws-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.ws-selected {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.ws-selected summary {
+  padding: 7px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Managed resources: what the workflow did to each one */
+.ws-row-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-row-toggle:hover {
+  color: var(--accent);
+}
+.ws-row-where {
+  display: block;
+  margin: 2px 0 0 16px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+.ws-detail-row td {
+  padding: 2px 12px 8px 26px;
+  background: var(--bg-input);
+}
+.ws-detail-row .ws-history li:first-child {
+  border-top: 0;
+}
+.ws-change {
+  font-weight: 600;
+}
+.ws-change-when {
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 .ws-filter {
   width: 100%;

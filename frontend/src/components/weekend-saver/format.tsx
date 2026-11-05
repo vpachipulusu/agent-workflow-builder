@@ -45,6 +45,12 @@ export function formatWhen(iso: string | null): string {
 
 export const shortType = (resourceType: string) => resourceType.split('/').pop() ?? resourceType
 
+/** What the workflow did to a resource, in words. */
+export function changeText({ action, outcome }: { action: string; outcome: string }): string {
+  const verb = action === 'disable' ? 'Disable' : 'Enable'
+  return outcome === 'succeeded' ? `${verb}d` : `${verb} failed`
+}
+
 /** A server value made safe to use as part of a class name. */
 export const classToken = (value: string) => value.toLowerCase().replace(/[^a-z0-9_-]/g, '')
 

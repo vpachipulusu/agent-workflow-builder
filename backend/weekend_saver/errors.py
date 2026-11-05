@@ -15,3 +15,7 @@ class ApprovalUnavailableError(WeekendSaverError):
 
 class StateStoreError(WeekendSaverError):
     """The prior-state snapshot could not be read or written."""
+
+
+class ActivityLogError(WeekendSaverError):
+    """The record of what was switched off and on could not be read or written."""

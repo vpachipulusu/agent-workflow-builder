@@ -53,9 +53,13 @@ Saver. The builder writes generated `.py` files under `backend/generated/`, whic
 1. Sign in with `az login` (the page also offers a browser sign-in). Your own Azure
    permissions apply: you need the right to start and stop the resources you pick.
 2. Start the backend without `WEEKEND_SAVER_DEMO`; the page opens unlocked.
-3. **Manage resources**: tick what should be switched off. Supported types are virtual
-   machines, scale sets, AKS clusters, App Service apps, Application Gateways, and
-   PostgreSQL and MySQL flexible servers. Everything else is listed greyed out.
+3. **Manage resources**: open a subscription, then a resource group, and tick what
+   should be switched off. Each level is loaded when you open it, so a large tenant
+   does not have to be listed in full. Supported types are virtual machines, scale
+   sets, AKS clusters, App Service apps, Application Gateways, and PostgreSQL and MySQL
+   flexible servers. Everything else is hidden until you tick **Show other types**,
+   and then listed greyed out. What is already managed is listed at the top under
+   **Selected**, and stays managed whether or not you open its group.
 4. **Dry run** shows the plan and changes nothing. **Disable now** and **Enable now**
    show the plan and wait for your approval.
 5. **Schedule** (off by default) runs disable and enable once a week, in this
@@ -66,6 +70,18 @@ Saver. The builder writes generated `.py` files under `backend/generated/`, whic
 Enable only starts what a disable run stopped, using a record kept in your user data
 folder (`%LOCALAPPDATA%\weekend-saver` on Windows, `~/.local/state/weekend-saver`
 elsewhere). A resource tagged `weekend-saver=skip` is left alone.
+
+### What was switched off and on
+
+The workflow keeps a record of every change it makes, in `activity.jsonl` in the same
+folder: one line per resource and change, with the time, whether it was a disable or
+an enable, and whether it worked. Runs from the page, the schedule and the command
+line all add to it; a dry run, a rejected plan and a resource that was skipped do not.
+
+On the page, **Managed resources** shows how many resources Weekend Saver has switched
+off right now and the last change of each one. Click a resource to load its history.
+The record is never shortened; the page reads its newest two megabytes, which is about
+ten thousand changes.
 
 ## Customizing the workflow
 

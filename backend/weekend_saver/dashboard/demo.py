@@ -9,7 +9,13 @@ from collections.abc import Mapping
 
 from weekend_saver.auth import SignInStatus
 from weekend_saver.azure_handlers import OPERATIONS
-from weekend_saver.discovery import DiscoveredResource
+from weekend_saver.discovery import (
+    DiscoveredResource,
+    GroupSummary,
+    SubscriptionSummary,
+    checked_resource_group,
+    checked_subscription_id,
+)
 from weekend_saver.handlers import ResourceHandler
 from weekend_saver.models import PowerState, ResourceSpec, ResourceStatus, ResourceTarget
 
@@ -143,5 +149,52 @@ class DemoAuth:
 
 
 class DemoDiscovery:
+    """Answers like Azure Resource Graph, slowly enough that loading can be seen."""
+
+    def __init__(self, read_delay_seconds: float = READ_DELAY_SECONDS) -> None:
+        self._read_delay = read_delay_seconds
+        self._everything = (*DEMO_RESOURCES, *DEMO_UNSUPPORTED)
+
     async def list(self) -> tuple[DiscoveredResource, ...]:
-        return (*DEMO_RESOURCES, *DEMO_UNSUPPORTED)
+        return self._everything
+
+    async def subscriptions(self) -> tuple[SubscriptionSummary, ...]:
+        await asyncio.sleep(self._read_delay)
+        names = {r.subscription_id: r.subscription_name for r in self._everything}
+        return tuple(
+            SubscriptionSummary(subscription_id, name, *self._counts(subscription_id))
+            for subscription_id, name in sorted(names.items(), key=lambda item: item[1])
+        )
+
+    async def groups(self, subscription_id: str) -> tuple[GroupSummary, ...]:
+        subscription_id = checked_subscription_id(subscription_id)
+        await asyncio.sleep(self._read_delay)
+        names = sorted(
+            {r.resource_group for r in self._everything if r.subscription_id == subscription_id}
+        )
+        return tuple(
+            GroupSummary(subscription_id, name, *self._counts(subscription_id, name))
+            for name in names
+        )
+
+    async def resources(
+        self, subscription_id: str, resource_group: str
+    ) -> tuple[DiscoveredResource, ...]:
+        subscription_id = checked_subscription_id(subscription_id)
+        wanted = checked_resource_group(resource_group).lower()
+        await asyncio.sleep(self._read_delay)
+        return tuple(
+            resource
+            for resource in self._everything
+            if resource.subscription_id == subscription_id
+            and resource.resource_group.lower() == wanted
+        )
+
+    def _counts(self, subscription_id: str, resource_group: str | None = None) -> tuple[int, int]:
+        held = [
+            resource
+            for resource in self._everything
+            if resource.subscription_id == subscription_id
+            and resource_group in (None, resource.resource_group)
+        ]
+        return len(held), sum(resource.supported for resource in held)

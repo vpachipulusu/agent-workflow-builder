@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.helpers import SUBSCRIPTION_ID, VM_TYPE, FakeHandler, vm_id
+from weekend_saver.activity import JsonlActivityLog
 from weekend_saver.auth import SignInStatus
 from weekend_saver.config import load_resource_specs, save_resource_specs
 from weekend_saver.dashboard.app import (
@@ -21,7 +22,13 @@ from weekend_saver.dashboard.app import (
 from weekend_saver.dashboard.history import RunHistory
 from weekend_saver.dashboard.run_manager import RunManager
 from weekend_saver.dashboard.scheduler import Scheduler, ScheduleStore
-from weekend_saver.discovery import DiscoveredResource
+from weekend_saver.discovery import (
+    DiscoveredResource,
+    GroupSummary,
+    SubscriptionSummary,
+    checked_resource_group,
+    checked_subscription_id,
+)
 from weekend_saver.models import PowerState, ResourceSpec, RunRequest
 from weekend_saver.state_store import JsonFileStateStore, Snapshot
 from weekend_saver.workflow import build_workflow
@@ -74,6 +81,19 @@ class FakeDiscovery:
         )
         return (*manageable, not_manageable)
 
+    async def subscriptions(self) -> tuple[SubscriptionSummary, ...]:
+        return (SubscriptionSummary(SUBSCRIPTION_ID, "Test Sub", 4, 3),)
+
+    async def groups(self, subscription_id: str) -> tuple[GroupSummary, ...]:
+        return (GroupSummary(checked_subscription_id(subscription_id), "rg-test", 4, 3),)
+
+    async def resources(
+        self, subscription_id: str, resource_group: str
+    ) -> tuple[DiscoveredResource, ...]:
+        checked_subscription_id(subscription_id)
+        checked_resource_group(resource_group)
+        return await self.list()
+
 
 class Dashboard:
     """A running dashboard wired to fakes, plus handles on the fakes."""
@@ -84,11 +104,16 @@ class Dashboard:
         self.resources_path = tmp_path / "resources.yaml"
         self.state_store = JsonFileStateStore(tmp_path / "state.json")
         self.history = RunHistory(tmp_path / "runs.jsonl")
+        self.activity = JsonlActivityLog(tmp_path / "activity.jsonl")
         handlers = {VM_TYPE: handler}
 
         def workflow_factory(_request):
             return build_workflow(
-                handlers, self.state_store, verify_attempts=2, verify_interval_seconds=0
+                handlers,
+                self.state_store,
+                verify_attempts=2,
+                verify_interval_seconds=0,
+                activity=self.activity,
             )
 
         runs = RunManager(workflow_factory, self.history, clock=lambda: NOW)
@@ -106,6 +131,7 @@ class Dashboard:
                 schedule_store, runs, request_for=lambda action: RunRequest(action, ())
             ),
             history=self.history,
+            activity=self.activity,
             clock=lambda: NOW,
         )
         self.app = create_app(self.services, TOKEN, port=PORT, session_id=SESSION)

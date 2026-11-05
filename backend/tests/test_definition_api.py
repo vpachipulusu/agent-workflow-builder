@@ -22,6 +22,7 @@ from tests.test_dashboard_api import BASE_URL as STANDALONE_URL
 from tests.test_dashboard_api import COOKIE as STANDALONE_COOKIE
 from tests.test_dashboard_api import SESSION as STANDALONE_SESSION
 from tests.test_dashboard_api import Dashboard, FakeAuth, FakeDiscovery
+from weekend_saver.activity import JsonlActivityLog
 from weekend_saver.config import save_resource_specs
 from weekend_saver.custom.compiler import compile_workflow
 from weekend_saver.custom.definition import EdgeDef, default_definition, definition_to_dict
@@ -79,6 +80,7 @@ class Customizable:
         self.resources_path = tmp_path / "resources.yaml"
         self.state_store = JsonFileStateStore(tmp_path / "state.json")
         self.history = RunHistory(tmp_path / "runs.jsonl")
+        self.activity = JsonlActivityLog(tmp_path / "activity.jsonl")
         handlers = {VM_TYPE: handler}
 
         def workflow_factory(request: RunRequest):
@@ -90,6 +92,7 @@ class Customizable:
                 model=self.model,
                 verify_interval_seconds=0,
                 notes=(StepNote("workflow", notice),) if notice else (),
+                activity=self.activity,
             )
 
         runs = RunManager(workflow_factory, self.history, clock=lambda: NOW)
@@ -107,6 +110,7 @@ class Customizable:
                 schedule_store, runs, request_for=lambda action: RunRequest(action, ())
             ),
             history=self.history,
+            activity=self.activity,
             clock=lambda: NOW,
             definitions=self.definitions,
             editor=editor,

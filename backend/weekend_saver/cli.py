@@ -22,6 +22,7 @@ from typing import Any, TextIO
 from agent_framework import FileCheckpointStorage
 from azure.identity import DefaultAzureCredential
 
+from weekend_saver.activity import ACTIVITY_FILE, JsonlActivityLog
 from weekend_saver.auth import AUTH_RECORD_FILE, SignedInCredential
 from weekend_saver.azure_handlers import build_azure_handlers
 from weekend_saver.config import load_resource_specs
@@ -280,13 +281,15 @@ async def _execute(
     notifier: Notifier | None,
 ) -> RunReport:
     checkpoints = _checkpoint_storage(args.checkpoint_dir)
+    state_file = args.state_file or default_data_dir() / "state.json"
     workflow = build_workflow(
         handlers,
-        JsonFileStateStore(args.state_file or default_data_dir() / "state.json"),
+        JsonFileStateStore(state_file),
         notifier=notifier,
         checkpoint_storage=checkpoints,
         verify_attempts=VERIFY_ATTEMPTS,
         verify_interval_seconds=VERIFY_INTERVAL_SECONDS,
+        activity=JsonlActivityLog(state_file.with_name(ACTIVITY_FILE)),
     )
     if request is None:
         return await resume_with_decision(

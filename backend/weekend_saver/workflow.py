@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from agent_framework import CheckpointStorage, Workflow, WorkflowBuilder
 
+from weekend_saver.activity import ActivityLog
 from weekend_saver.executors import (
     DEFAULT_MAX_SNAPSHOT_AGE,
     DEFAULT_VERIFY_ATTEMPTS,
@@ -38,14 +39,23 @@ def build_workflow(
     verify_interval_seconds: float = DEFAULT_VERIFY_INTERVAL_SECONDS,
     max_snapshot_age: timedelta = DEFAULT_MAX_SNAPSHOT_AGE,
     clock: Callable[[], datetime] = _utc_now,
+    activity: ActivityLog | None = None,
 ) -> Workflow:
-    """Build the graph; `handlers` maps lower-case ARM resource types to their handler."""
+    """Build the graph; `handlers` maps lower-case ARM resource types to their handler.
+
+    With `activity`, every change a run makes is added to that record.
+    """
     load = LoadTargets(frozenset(handlers))
     resolve = ResolveState(handlers, state_store, clock=clock, max_snapshot_age=max_snapshot_age)
     approval = Approval()
     apply = Apply(handlers, state_store, clock)
     verify = Verify(
-        handlers, state_store, attempts=verify_attempts, interval_seconds=verify_interval_seconds
+        handlers,
+        state_store,
+        attempts=verify_attempts,
+        interval_seconds=verify_interval_seconds,
+        activity=activity,
+        clock=clock,
     )
     report = Report(notifier)
 

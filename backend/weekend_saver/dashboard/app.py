@@ -26,12 +26,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
+from weekend_saver.activity import ActivityLog
 from weekend_saver.arm import build_targets, parse_resource_id
 from weekend_saver.auth import NotSignedInError, SignInStatus
 from weekend_saver.config import load_resource_specs, save_resource_specs
 from weekend_saver.custom.store import DefinitionStore
 from weekend_saver.dashboard.definition_api import DefinitionEditor, add_definition_routes
 from weekend_saver.dashboard.history import RunHistory
+from weekend_saver.dashboard.resource_api import add_resource_routes
 from weekend_saver.dashboard.run_manager import (
     RESYNC,
     NoPendingApprovalError,
@@ -130,6 +132,7 @@ class DashboardServices:
     schedule_store: ScheduleStore
     scheduler: Scheduler
     history: RunHistory
+    activity: ActivityLog
     demo: bool = False
     clock: Callable[[], datetime] = datetime.now
     # Set when the workflow is customizable; the definition routes exist only then
@@ -358,7 +361,7 @@ def create_app(
     @app.get("/api/resources")
     async def resources() -> JSONResponse:
         specs = await asyncio.to_thread(_specs_or_empty)
-        rows = await managed_rows(specs, services.handlers, services.state_store)
+        rows = await managed_rows(specs, services.handlers, services.state_store, services.activity)
         return ok(rows)
 
     @app.put("/api/resources")
@@ -431,6 +434,13 @@ def create_app(
         if not services.resources_path.exists():
             return ()
         return load_resource_specs(services.resources_path)
+
+    add_resource_routes(
+        app,
+        discovery=services.discovery,
+        activity=services.activity,
+        load_specs=_specs_or_empty,
+    )
 
     def _schedule_view(state: ScheduleState) -> dict[str, Any]:
         schedule = state.schedule

@@ -128,19 +128,58 @@ export interface ManagedRow {
   skip: boolean
   disabled_by_us: boolean
   error: string
+  // What the workflow last did to it; null when it never changed it
+  last_change: LastChange | null
 }
 
-export interface PickerRow {
+export interface LastChange {
+  action: string
+  outcome: string
+  at: string
+  detail: string
+}
+
+/** One attempt of the workflow to switch a resource off or on. */
+export interface Change extends LastChange {
+  resource_id: string
+  name: string
+  state: string
+}
+
+/** A subscription or resource group, with how much it holds. */
+export interface SubscriptionSummary {
+  subscription_id: string
+  name: string
+  total: number
+  // How many of them can be stopped and started
+  supported: number
+}
+
+export interface GroupSummary {
+  subscription_id: string
+  resource_group: string
+  total: number
+  supported: number
+}
+
+export interface FoundResource {
   resource_id: string
   name: string
   resource_type: string
   resource_group: string
-  subscription_name: string
+  subscription_id: string
   location: string
   supported: boolean
-  managed: boolean
+}
+
+/** A saved resource as it is on disk, without its live state. */
+export interface SelectedRow {
+  id: string
+  name: string
   order: number
-  found: boolean
+  type: string
+  resource_group: string
+  subscription_id: string
 }
 
 export interface WeeklyTime {
@@ -204,9 +243,21 @@ export const editDefinition = (prompt: string) =>
 export const resetDefinition = () => call<DefinitionView>('/definition/reset', 'POST')
 
 export const getManaged = () => call<ManagedRow[]>('/resources')
-export const getDiscovered = () => call<PickerRow[]>('/discovery')
+export const getSelection = () => call<SelectedRow[]>('/selection')
 export const saveManaged = (resources: { id: string; order: number }[]) =>
   call<{ saved: number }>('/resources', 'PUT', { resources })
+
+const query = (values: Record<string, string>) => new URLSearchParams(values).toString()
+
+// Azure is looked through one level at a time; nothing is loaded before it is opened
+export const getSubscriptions = () => call<SubscriptionSummary[]>('/discovery/subscriptions')
+export const getGroups = (subscription: string) =>
+  call<GroupSummary[]>(`/discovery/groups?${query({ subscription })}`)
+export const getGroupResources = (subscription: string, group: string) =>
+  call<FoundResource[]>(`/discovery/resources?${query({ subscription, group })}`)
+
+export const getActivity = (resource: string, limit: number) =>
+  call<Change[]>(`/activity?${query({ resource, limit: String(limit) })}`)
 
 export const getRuns = () => call<{ current: RunSnapshot | null; recent: RunRecord[] }>('/runs')
 export const startRun = (action: Action, dryRun: boolean, ignorePriorState = false) =>

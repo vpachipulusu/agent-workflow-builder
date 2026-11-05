@@ -16,6 +16,7 @@ from pathlib import Path
 import uvicorn
 from agent_framework import Workflow
 
+from weekend_saver.activity import ACTIVITY_FILE, JsonlActivityLog
 from weekend_saver.auth import AUTH_RECORD_FILE, SignedInCredential
 from weekend_saver.azure_handlers import OPERATIONS, build_azure_handlers
 from weekend_saver.config import load_resource_specs, save_resource_specs
@@ -80,13 +81,18 @@ def build_services(
         verify_interval = DEFAULT_VERIFY_INTERVAL_SECONDS
 
     state_store = JsonFileStateStore(data_dir / "state.json")
+    activity = JsonlActivityLog(data_dir / ACTIVITY_FILE)
     history = RunHistory(data_dir / "runs.jsonl")
     schedule_store = ScheduleStore(data_dir / "schedule.json")
 
     def workflow_factory(request: RunRequest) -> Workflow:
         if definitions is None:
             return build_workflow(
-                handlers, state_store, notifier=notifier, verify_interval_seconds=verify_interval
+                handlers,
+                state_store,
+                notifier=notifier,
+                verify_interval_seconds=verify_interval,
+                activity=activity,
             )
         definition, notice = definitions.runnable(request.action)
         return compile_workflow(
@@ -97,6 +103,7 @@ def build_services(
             notifier=notifier,
             verify_interval_seconds=verify_interval if demo else None,
             notes=(StepNote("workflow", notice),) if notice else (),
+            activity=activity,
         )
 
     def scheduled_request(action: Action) -> RunRequest:
@@ -121,6 +128,7 @@ def build_services(
         schedule_store=schedule_store,
         scheduler=scheduler,
         history=history,
+        activity=activity,
         demo=demo,
         definitions=definitions,
         editor=editor,

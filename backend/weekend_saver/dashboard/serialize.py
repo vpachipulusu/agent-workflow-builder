@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 from typing import Any
 
+from weekend_saver.activity import Change
 from weekend_saver.models import ActionPlan, ActionResult, RunReport, StepNote
 from weekend_saver.planning import unapplied_results
 
@@ -18,6 +19,18 @@ def result_to_json(result: ActionResult) -> dict[str, Any]:
         "outcome": result.outcome.value,
         "detail": result.detail,
         "state": result.state.value,
+    }
+
+
+def change_to_json(change: Change) -> dict[str, str]:
+    return {
+        "at": change.at,
+        "resource_id": change.resource_id,
+        "name": change.name,
+        "action": change.action,
+        "outcome": change.outcome,
+        "detail": change.detail,
+        "state": change.state,
     }
 
 

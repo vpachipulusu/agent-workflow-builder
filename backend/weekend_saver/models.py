@@ -141,6 +141,9 @@ class AppliedPlan:
     action: Action
     results: tuple[ActionResult, ...]
     to_verify: tuple[ResourceTarget, ...]
+    # Keys of the resources the run acted on, whether or not that worked. The others
+    # in `results` were only looked at: skipped, or their state could not be read.
+    attempted: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -5,6 +5,7 @@ import pytest
 
 from tests.helpers import VM_TYPE, FakeHandler, vm_id
 from weekend_saver import cli
+from weekend_saver.activity import JsonlActivityLog
 from weekend_saver.auth import SignInStatus
 from weekend_saver.models import PowerState
 
@@ -56,6 +57,17 @@ def test_disable_with_yes_acts_and_exits_zero(resources, state_file, capsys):
     assert handler.calls == [("disable", "app")]
     assert "weekend-saver disable: completed" in capsys.readouterr().out
     assert state_file.exists()
+
+
+def test_a_run_adds_to_the_activity_record_beside_the_state_file(resources, state_file):
+    handler = FakeHandler({"app": RUNNING})
+
+    run(handler, "disable", "--resources", resources, "--state-file", state_file, "--yes")
+
+    recorded = JsonlActivityLog(state_file.with_name("activity.jsonl")).recent()
+    assert [(change.name, change.action, change.outcome) for change in recorded] == [
+        ("app", "disable", "succeeded")
+    ]
 
 
 def test_dry_run_prints_plan_and_changes_nothing(resources, state_file, capsys):

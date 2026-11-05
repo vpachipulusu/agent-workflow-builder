@@ -22,8 +22,9 @@ from typing import Never
 
 from agent_framework import Executor, WorkflowContext, handler, response_handler
 
+from weekend_saver.activity import ActivityLog, Change
 from weekend_saver.arm import build_targets, parse_resource_id
-from weekend_saver.errors import ConfigError, StateStoreError
+from weekend_saver.errors import ActivityLogError, ConfigError, StateStoreError
 from weekend_saver.handlers import ResourceHandler
 from weekend_saver.models import (
     Action,
@@ -44,7 +45,7 @@ from weekend_saver.models import (
     StepNote,
     ValidatedRequest,
 )
-from weekend_saver.notes import read_notes
+from weekend_saver.notes import add_note, read_notes
 from weekend_saver.notifier import Notifier
 from weekend_saver.planning import decide, decide_unlisted, unapplied_result, unapplied_results
 from weekend_saver.state_store import Snapshot, StateStore
@@ -351,8 +352,10 @@ class Apply(Executor):
             for item in plan.actionable
             if applied[item.target.key].outcome is Outcome.SUCCEEDED
         )
+        attempted = tuple(item.target.key for item in plan.actionable)
         await ctx.send_message(
-            AppliedPlan(action, results, to_verify), target_id=self._routes["applied"]
+            AppliedPlan(action, results, to_verify, attempted),
+            target_id=self._routes["applied"],
         )
 
     def _record_disabled(self, items: Iterable[PlannedAction]) -> None:
@@ -418,6 +421,8 @@ class Verify(Executor):
         *,
         attempts: int = DEFAULT_VERIFY_ATTEMPTS,
         interval_seconds: float = DEFAULT_VERIFY_INTERVAL_SECONDS,
+        activity: ActivityLog | None = None,
+        clock: Callable[[], datetime] = _utc_now,
         routes: Routes | None = None,
     ) -> None:
         super().__init__(id=VERIFY_ID)
@@ -425,6 +430,8 @@ class Verify(Executor):
         self._state_store = state_store
         self._attempts = attempts
         self._interval_seconds = interval_seconds
+        self._activity = activity
+        self._clock = clock
         self._routes = _routes_for(VERIFY_ID, routes)
 
     @handler
@@ -436,10 +443,49 @@ class Verify(Executor):
         verified = {result.key: result for result in confirmed}
         results = tuple(verified.get(result.key, result) for result in applied.results)
         error = self._forget_running(results) if applied.action is Action.ENABLE else ""
+        attempted = frozenset(applied.attempted)
+        self._record_changes(
+            applied.action, (result for result in results if result.key in attempted), ctx
+        )
         await ctx.send_message(
             RunReport(applied.action, RunStatus.COMPLETED, results, error),
             target_id=self._routes["verified"],
         )
+
+    def _record_changes(
+        self, action: Action, results: Iterable[ActionResult], ctx: WorkflowContext[RunReport]
+    ) -> None:
+        """Add the changes this run attempted to the activity record.
+
+        `results` are those of the resources the run acted on. A resource it skipped, or
+        could not even read, was not changed and leaves no trace. A record that cannot
+        be written leaves a note instead of failing the run: the resources have already
+        been changed, and the report has to say so.
+        """
+        if self._activity is None:
+            return
+        now = self._clock().isoformat()
+        changes = [
+            Change(
+                now,
+                result.resource_id,
+                action.value,
+                result.outcome.value,
+                result.detail,
+                result.state.value,
+            )
+            for result in results
+        ]
+        try:
+            self._activity.record(changes)
+        except ActivityLogError:
+            logger.exception("Could not write the activity record")
+            add_note(
+                ctx,
+                VERIFY_ID,
+                "The resources were processed, but the activity record could not be "
+                "written; see the log.",
+            )
 
     async def _confirm(
         self, target: ResourceTarget, action: Action, limiter: asyncio.Semaphore

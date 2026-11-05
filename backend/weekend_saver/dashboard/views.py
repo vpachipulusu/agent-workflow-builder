@@ -7,9 +7,10 @@ from typing import Any
 
 from agent_framework import Workflow
 
+from weekend_saver.activity import ActivityLog
 from weekend_saver.arm import parse_resource_id
 from weekend_saver.dashboard.serialize import short_name
-from weekend_saver.errors import ConfigError, StateStoreError
+from weekend_saver.errors import ActivityLogError, ConfigError, StateStoreError
 from weekend_saver.executors import MAX_CONCURRENCY, describe_error
 from weekend_saver.handlers import ResourceHandler
 from weekend_saver.models import PowerState, ResourceSpec
@@ -64,11 +65,58 @@ async def managed_rows(
     specs: Iterable[ResourceSpec],
     handlers: Mapping[str, ResourceHandler],
     state_store: StateStore,
+    activity: ActivityLog,
 ) -> list[dict[str, Any]]:
     """One row per managed resource with its live power state; errors stay per row."""
     recorded = _recorded_keys(state_store)
+    latest = _latest_changes(activity)
     limiter = asyncio.Semaphore(MAX_CONCURRENCY)
-    return list(await asyncio.gather(*(_row(spec, handlers, recorded, limiter) for spec in specs)))
+    rows = await asyncio.gather(*(_row(spec, handlers, recorded, limiter) for spec in specs))
+    return [{**row, "last_change": latest.get(row["id"].lower())} for row in rows]
+
+
+def selection_rows(specs: Iterable[ResourceSpec]) -> list[dict[str, Any]]:
+    """The saved selection as it is on disk, without asking Azure about anything."""
+    return [_described(spec) for spec in specs]
+
+
+def _described(spec: ResourceSpec) -> dict[str, Any]:
+    row = {
+        "id": spec.resource_id,
+        "name": short_name(spec.resource_id),
+        "order": spec.order,
+        "type": "",
+        "resource_group": "",
+        "subscription_id": "",
+    }
+    try:
+        target = parse_resource_id(spec.resource_id, spec.order)
+    except ConfigError:
+        return row
+    return {
+        **row,
+        "type": target.resource_type,
+        "resource_group": target.resource_group,
+        "subscription_id": target.subscription_id,
+    }
+
+
+def _latest_changes(activity: ActivityLog) -> dict[str, dict[str, str]]:
+    """What the workflow last did to each resource, keyed by lower-cased ARM ID."""
+    try:
+        latest = activity.latest()
+    except ActivityLogError:
+        logger.warning("Could not read the activity record for the dashboard", exc_info=True)
+        return {}
+    return {
+        key: {
+            "action": change.action,
+            "outcome": change.outcome,
+            "at": change.at,
+            "detail": change.detail,
+        }
+        for key, change in latest.items()
+    }
 
 
 def _recorded_keys(state_store: StateStore) -> frozenset[str]:
