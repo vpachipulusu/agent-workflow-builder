@@ -7,7 +7,10 @@ const backend = process.env.BACKEND_URL ?? 'http://localhost:8000'
 export default defineConfig({
   plugins: [react()],
   server: {
+    // `npm run dev` frees this port first (see "predev" in package.json). Never move to
+    // another port: the backend only trusts requests from this one
     port: 5173,
+    strictPort: true,
     proxy: {
       '/api': {
         target: backend,

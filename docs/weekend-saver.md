@@ -13,8 +13,12 @@ It shows up in the builder as the `weekend_saver` workflow and has its own page,
 ```bash
 cd backend
 # Windows PowerShell: $env:WEEKEND_SAVER_DEMO = "1"
-WEEKEND_SAVER_DEMO=1 uvicorn main:app --port 8000
+WEEKEND_SAVER_DEMO=1 python start.py
 ```
+
+`start.py` stops whatever already serves port 8000 before it starts, so an older copy of
+the backend cannot keep answering in its place. If the Weekend Saver page reports
+"Request failed (HTTP 404)", that is what happened: an older backend is still running.
 
 Demo mode uses an in-memory fake of Azure and a throwaway data folder. Start the
 frontend as usual (`npm run dev` in `frontend/`).
@@ -31,7 +35,7 @@ Open that link. It works once, sets a session cookie, and sends you to the build
 Without it the Weekend Saver page explains that it is locked. Restart the backend to
 get a new link.
 
-Run the backend **without `--reload`** when you use Weekend Saver. The builder writes
+Run the backend **without `--reload`** (the default of `start.py`) when you use Weekend Saver. The builder writes
 generated `.py` files under `backend/generated/`, which makes `--reload` restart the
 server: a restart ends a run in progress and invalidates the link.
 

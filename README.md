@@ -123,7 +123,7 @@ cd ..
 ```bash
 # Terminal 1 — Backend
 cd backend
-uvicorn main:app --reload --port 8000
+python start.py            # add --reload to restart on code changes
 
 # Terminal 2 — Frontend
 cd frontend
@@ -131,6 +131,12 @@ npm run dev
 ```
 
 Open **http://localhost:5173** in your browser.
+
+Both commands first stop whatever is already serving their port (8000 and 5173), then
+start. A forgotten server from an earlier session is replaced instead of answering in
+place of the new one, which on Windows otherwise happens silently. Anything else you run
+on those ports is stopped too; use `python start.py --port <n>` to pick another port for
+the backend. Starting `uvicorn main:app` directly still works, without that check.
 
 ## Weekend Saver
 
