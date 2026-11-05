@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,13 @@ class _Recorder:
     def __call__(self, command: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
         self.calls.append(tuple(command))
         return subprocess.CompletedProcess(command, self.returncode)
+
+
+@pytest.fixture(autouse=True)
+def no_choice_about_the_link(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Set first, so that what the launcher writes is undone after the test
+    monkeypatch.setenv(start.OPEN_LINK_ENV, "")
+    monkeypatch.delenv(start.OPEN_LINK_ENV)
 
 
 @pytest.fixture
@@ -61,6 +69,32 @@ def test_uses_the_port_and_reload_it_is_given(
     assert node.calls[0][-1] == "8011"
     assert served[0]["port"] == 8011
     assert served[0]["reload"] is True
+
+
+def test_asks_the_backend_to_open_weekend_saver_in_the_browser(
+    node: _Recorder, served: list[dict[str, Any]]
+) -> None:
+    start.main([])
+
+    assert os.environ[start.OPEN_LINK_ENV] == "1"
+
+
+def test_does_not_open_a_browser_tab_on_every_reload(
+    node: _Recorder, served: list[dict[str, Any]]
+) -> None:
+    start.main(["--reload"])
+
+    assert start.OPEN_LINK_ENV not in os.environ
+
+
+def test_keeps_a_choice_about_the_link_that_was_already_made(
+    monkeypatch: pytest.MonkeyPatch, node: _Recorder, served: list[dict[str, Any]]
+) -> None:
+    monkeypatch.setenv(start.OPEN_LINK_ENV, "0")
+
+    start.main([])
+
+    assert os.environ[start.OPEN_LINK_ENV] == "0"
 
 
 def test_does_not_start_when_the_port_cannot_be_freed(

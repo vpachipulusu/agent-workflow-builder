@@ -8,14 +8,18 @@ session cookie, and changed only from the builder's page.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
 import sys
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+import time
+import webbrowser
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import yaml
 from fastapi import FastAPI
@@ -37,8 +41,15 @@ logger = logging.getLogger(__name__)
 MOUNT_PATH = "/ws"
 COOKIE_NAME = "weekend_saver_session_builder"
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1"})
+# Where the one-time link sends the browser: the builder's Weekend Saver page
+HOME_PAGE = "/weekend-saver"
 # Lower than the builder's default: a note or a stop decision should not be inventive
 STEP_TEMPERATURE = 0.2
+# The frontend is usually started after the backend, so the browser waits for it
+PAGE_WAIT_SECONDS = 600.0
+PAGE_POLL_SECONDS = 1.0
+CONNECT_TIMEOUT_SECONDS = 1.0
+DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 class OpenApiCors(CORSMiddleware):
@@ -75,26 +86,122 @@ async def edit_with_chat(current: dict[str, Any], prompt: str) -> dict[str, Any]
     return await request_workflow_edit(current_yaml, prompt, guidance=edit_guidance())
 
 
+async def is_served(host: str, port: int) -> bool:
+    """Whether something accepts connections on that port."""
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), CONNECT_TIMEOUT_SECONDS
+        )
+    except (OSError, TimeoutError):
+        return False
+    writer.close()
+    with suppress(OSError):
+        await writer.wait_closed()
+    return True
+
+
+@dataclass(frozen=True)
+class _Page:
+    origin: str
+    host: str
+    port: int
+
+
+def _local_page(link: str) -> _Page | None:
+    """The page a link points at, when that is a web page on this computer.
+
+    The link is built from FRONTEND_ORIGINS, so a mistake there ends here instead of
+    being handed to the operating system to open.
+    """
+    target = urlsplit(link)
+    try:
+        port = target.port or DEFAULT_PORTS.get(target.scheme)
+    except ValueError:  # a port that cannot exist
+        return None
+    if port is None or target.scheme not in DEFAULT_PORTS or target.hostname not in LOCAL_HOSTS:
+        return None
+    return _Page(f"{target.scheme}://{target.netloc}", target.hostname, port)
+
+
+async def open_when_served(
+    link: str,
+    *,
+    opener: Callable[[str], bool] = webbrowser.open,
+    wait_seconds: float = PAGE_WAIT_SECONDS,
+    poll_seconds: float = PAGE_POLL_SECONDS,
+) -> bool:
+    """Open the one-time link in the browser once the page it points at is running.
+
+    The link goes through the frontend: opened before that has started, it would only
+    show a connection error. The link itself is kept out of the log.
+    """
+    page = _local_page(link)
+    if page is None:
+        logger.warning(
+            "Weekend Saver was not opened in the browser: the first entry of "
+            "FRONTEND_ORIGINS is not a web page on this computer."
+        )
+        return False
+    deadline = time.monotonic() + wait_seconds
+    # Waiting first also gives this backend, started a moment ago, time to listen
+    await asyncio.sleep(poll_seconds)
+    while not await is_served(page.host, page.port):
+        if time.monotonic() >= deadline:
+            logger.warning(
+                "Weekend Saver: %s is not running, so nothing was opened. "
+                "Start the frontend, then open the link printed above.",
+                page.origin,
+            )
+            return False
+        await asyncio.sleep(poll_seconds)
+    try:
+        opened = await asyncio.to_thread(opener, link)
+        reason = "no browser was found"
+    except Exception as error:  # a convenience: no browser problem may stop the backend
+        opened = False
+        reason = type(error).__name__  # its text can repeat the link
+    if not opened:
+        logger.warning(
+            "Weekend Saver could not be opened in the browser (%s). "
+            "Open the link printed above yourself.",
+            reason,
+        )
+    return bool(opened)
+
+
 @dataclass(frozen=True)
 class Hosted:
     app: FastAPI
     services: DashboardServices
     definitions: DefinitionStore
     link: str
+    open_link: bool = False
 
     @asynccontextmanager
     async def running(self) -> AsyncIterator[None]:
         """Enter from the builder's lifespan: mounted apps do not get one of their own."""
         # Written here, not at import, so importing the builder never touches the disk
         self.definitions.ensure()
+        by_itself = (
+            "it opens in your browser by itself once the frontend is running; "
+            if self.open_link
+            else ""
+        )
         sys.stdout.write(
             f"Weekend Saver: open {self.link}\n"
-            "(the link works once and unlocks the Weekend Saver controls; "
+            f"({by_itself}the link works once and unlocks the Weekend Saver controls; "
             "restart the backend for a new one)\n"
         )
         sys.stdout.flush()
-        async with background(self.services):
-            yield
+        opening = asyncio.create_task(open_when_served(self.link)) if self.open_link else None
+        try:
+            async with background(self.services):
+                yield
+        finally:
+            if opening is not None:
+                opening.cancel()
+                with suppress(asyncio.CancelledError):
+                    await opening
 
 
 def build_hosted(
@@ -104,8 +211,11 @@ def build_hosted(
     model_configured: bool,
     demo: bool = False,
     data_dir: Path | None = None,
+    open_link: bool = False,
 ) -> Hosted:
     """Build the protected app. `origins` are the pages the builder is served from.
+
+    With `open_link` the running backend opens the one-time link in the browser itself.
 
     Without a configured model, AI steps and chat edits say so at once instead of
     waiting on a client that has nowhere to connect to.
@@ -124,8 +234,9 @@ def build_hosted(
         cookie_name=COOKIE_NAME,
         hosts=LOCAL_HOSTS,
         origins=frozenset(origin.lower() for origin in origins),
-        home_url="/",
+        home_url=HOME_PAGE,
         cookie_path=MOUNT_PATH,
     )
     app = create_app(services, token, exposure=exposure)
-    return Hosted(app, services, definitions, f"{origins[0]}{MOUNT_PATH}/?token={token}")
+    link = f"{origins[0]}{MOUNT_PATH}/?token={token}"
+    return Hosted(app, services, definitions, link, open_link)

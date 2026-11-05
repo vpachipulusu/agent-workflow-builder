@@ -150,9 +150,10 @@ as the person signed in with `az login`.
 - Customize it in plain words or as JSON: add AI steps that comment on a run, or AI
   gates that stop a disable run before anything changes. The six built-in steps
   cannot be removed or bypassed, and a model problem can never keep resources off.
-- Because it changes real resources, it is unlocked with the one-time
-  `Weekend Saver: open ...` link the backend prints at start-up, and the open `/api`
-  endpoints cannot edit or run it.
+- Because it changes real resources, it is unlocked with a one-time link. Started with
+  `python start.py`, the backend opens that link in your browser by itself; it also
+  prints it as `Weekend Saver: open ...`. The open `/api` endpoints cannot edit or run
+  the workflow.
 - Try it safely with `WEEKEND_SAVER_DEMO=1`, which uses a fake Azure.
 
 Run the backend without `--reload` when you use it. Details:

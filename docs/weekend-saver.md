@@ -25,25 +25,34 @@ frontend as usual (`npm run dev` in `frontend/`).
 
 ## Unlocking the page
 
-When the backend starts it prints a line like:
+Start the backend with `python start.py` and the frontend with `npm run dev`, in either
+order. As soon as both run, the backend opens the Weekend Saver page in your default
+browser, already unlocked. There is nothing to copy.
+
+Behind that is a one-time link, which the backend also prints:
 
 ```
 Weekend Saver: open http://localhost:5173/ws/?token=...
 ```
 
-Open that link. It works once, sets a session cookie, and sends you to the builder.
-Without it the Weekend Saver page explains that it is locked. Restart the backend to
-get a new link.
+It works once, sets a session cookie, and sends the browser to the Weekend Saver page.
+Without it the page explains that it is locked. Restart the backend to get a new link.
+Open the printed link yourself when:
 
-Run the backend **without `--reload`** (the default of `start.py`) when you use Weekend Saver. The builder writes
-generated `.py` files under `backend/generated/`, which makes `--reload` restart the
-server: a restart ends a run in progress and invalidates the link.
+- you want another browser than the default one;
+- no tab opened (the backend waits ten minutes for the frontend, then gives up);
+- you start the backend with `uvicorn main:app` or with `--reload`, which only print
+  the link unless you set `WEEKEND_SAVER_OPEN_LINK=1` yourself, or you set it to `0`.
+
+Run the backend **without `--reload`** (the default of `start.py`) when you use Weekend
+Saver. The builder writes generated `.py` files under `backend/generated/`, which makes
+`--reload` restart the server: a restart ends a run in progress and invalidates the link.
 
 ## Using it for real
 
 1. Sign in with `az login` (the page also offers a browser sign-in). Your own Azure
    permissions apply: you need the right to start and stop the resources you pick.
-2. Start the backend without `WEEKEND_SAVER_DEMO` and open the printed link.
+2. Start the backend without `WEEKEND_SAVER_DEMO`; the page opens unlocked.
 3. **Manage resources**: tick what should be switched off. Supported types are virtual
    machines, scale sets, AKS clusters, App Service apps, Application Gateways, and
    PostgreSQL and MySQL flexible servers. Everything else is listed greyed out.
@@ -143,7 +152,9 @@ What is still true, and worth knowing:
 - Browsers send a `localhost` cookie to every local port. The session cookie is limited
   to `/ws`, but a hostile program serving a site on another local port, opened in the
   same browser, could still capture it. Unlock Weekend Saver in a browser you do not
-  use for untrusted local apps.
+  use for untrusted local apps. `python start.py` unlocks it in your default browser;
+  if that is not the one you want, set `WEEKEND_SAVER_OPEN_LINK=0` and open the
+  printed link where you do.
 - The rest of the builder is still a local proof of concept: its `/api` endpoints have
   no sign-in and no Host check.
 
@@ -152,6 +163,7 @@ What is still true, and worth knowing:
 | Variable | Default | Meaning |
 |---|---|---|
 | `WEEKEND_SAVER_DEMO` | unset | `1` runs against the in-memory fake of Azure |
+| `WEEKEND_SAVER_OPEN_LINK` | `1` with `python start.py`, otherwise unset | `1` opens the one-time link in the browser at start-up; `0` only prints it |
 | `FRONTEND_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Pages allowed to drive Weekend Saver; the first is used in the printed link |
 | `WEEKEND_SAVER_WEBHOOK_URL` | unset | HTTPS webhook that receives each run report |
 | `BACKEND_URL` (frontend) | `http://localhost:8000` | Where the Vite dev server forwards `/api` and `/ws` |

@@ -169,7 +169,7 @@ export default function WeekendSaverPage() {
       {disconnected && (
         <div className="ws-problem" role="alert">
           Live updates have stopped, so what you see may be out of date. Reload the page; if it
-          then says it is locked, open a new link from the backend terminal.
+          then says it is locked, restart the backend.
         </div>
       )}
 
@@ -215,16 +215,19 @@ function Locked() {
     <div className="card ws-card ws-locked">
       <span className="card-title">Weekend Saver is locked</span>
       <p>
-        This part of the builder can really stop and start Azure resources, so it only works in
-        a browser that was opened with its own link.
+        This page can really stop and start Azure resources, so the backend has to unlock it
+        for this browser.
       </p>
       <ol>
-        <li>Look at the terminal where the backend is running.</li>
         <li>
-          Open the line that starts with <code>Weekend Saver: open</code>. The link works once.
+          Stop the backend and start it again with <code>python start.py</code>.
         </li>
-        <li>If it was already used, restart the backend to get a new one.</li>
+        <li>This page opens by itself in a new tab, unlocked.</li>
       </ol>
+      <p>
+        If no tab opens, use the link in the backend terminal: the line that starts with{' '}
+        <code>Weekend Saver: open</code>. It works once.
+      </p>
     </div>
   )
 }

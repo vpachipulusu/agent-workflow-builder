@@ -4,12 +4,17 @@
 
 On Windows two servers can bind one port and the older one keeps answering, so a
 forgotten server makes a fresh start look broken instead of failing to start.
+
+Without --reload the backend also opens the Weekend Saver page in the browser, already
+unlocked, once the frontend is running. Set WEEKEND_SAVER_OPEN_LINK=0 to only print
+the link.
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import shutil
 import subprocess
 from collections.abc import Sequence
@@ -23,6 +28,8 @@ FREE_PORT_SCRIPT = BACKEND_DIR.parent / "frontend" / "scripts" / "free-port.mjs"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 MAX_PORT = 65535
+# Read by config.py: "1" makes the backend open Weekend Saver in the browser, unlocked
+OPEN_LINK_ENV = "WEEKEND_SAVER_OPEN_LINK"
 
 logger = logging.getLogger("start")
 
@@ -60,6 +67,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     arguments = _arguments(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     free_port(arguments.port)
+    if not arguments.reload:
+        # Every reload makes a new link, which would open another browser tab each time
+        os.environ.setdefault(OPEN_LINK_ENV, "1")
     uvicorn.run(
         "main:app",
         host=arguments.host,

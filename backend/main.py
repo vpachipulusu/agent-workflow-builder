@@ -20,6 +20,7 @@ from config import (
     AZURE_OPENAI_ENDPOINT,
     FRONTEND_ORIGINS,
     WEEKEND_SAVER_DEMO,
+    WEEKEND_SAVER_OPEN_LINK,
     WORKFLOWS_DIR,
 )
 from llm_client import chat_completion
@@ -59,6 +60,7 @@ weekend_saver = build_hosted(
     origins=FRONTEND_ORIGINS,
     model_configured=bool(AZURE_OPENAI_ENDPOINT),
     demo=WEEKEND_SAVER_DEMO,
+    open_link=WEEKEND_SAVER_OPEN_LINK,
 )
 
 _MANAGED_ELSEWHERE = (

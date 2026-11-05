@@ -30,6 +30,8 @@ AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "")
 # -- Weekend Saver ----------------------------------------------------------
 # "1" runs the Weekend Saver workflow against an in-memory fake of Azure
 WEEKEND_SAVER_DEMO = os.getenv("WEEKEND_SAVER_DEMO", "") == "1"
+# "1" opens the one-time link in the browser at start-up; start.py sets it
+WEEKEND_SAVER_OPEN_LINK = os.getenv("WEEKEND_SAVER_OPEN_LINK", "") == "1"
 # Pages allowed to drive the Weekend Saver workflow; the first one is used in the
 # one-time link printed at start-up
 FRONTEND_ORIGINS = tuple(
