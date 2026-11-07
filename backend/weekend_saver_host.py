@@ -22,11 +22,14 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import yaml
+from agent_framework import Agent, ChatOptions, SupportsChatGetResponse
+from agent_framework.openai import OpenAIChatCompletionClient
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import Receive, Scope, Send
 
-from llm_client import chat_completion
+from config import AZURE_OPENAI_DEPLOYMENT
+from llm_client import get_client
 from orchestrator import request_workflow_edit
 from weekend_saver.cli import notifier_from_environment
 from weekend_saver.custom.definition import DEFINITION_NAME
@@ -45,6 +48,8 @@ LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1"})
 HOME_PAGE = "/weekend-saver"
 # Lower than the builder's default: a note or a stop decision should not be inventive
 STEP_TEMPERATURE = 0.2
+# How the AI steps' agent shows up in the framework's logs and telemetry
+STEP_AGENT_NAME = "weekend-saver-step"
 # The frontend is usually started after the backend, so the browser waits for it
 PAGE_WAIT_SECONDS = 600.0
 PAGE_POLL_SECONDS = 1.0
@@ -68,16 +73,35 @@ class OpenApiCors(CORSMiddleware):
         await super().__call__(scope, receive, send)
 
 
-class BuilderModel:
-    """Answers the workflow's AI steps with the builder's Azure OpenAI deployment."""
+def step_chat_client() -> SupportsChatGetResponse:
+    """The Agent Framework chat client for AI steps: the builder's own signed-in deployment."""
+    return OpenAIChatCompletionClient(model=AZURE_OPENAI_DEPLOYMENT, async_client=get_client())
+
+
+class AgentModel:
+    """Answers the workflow's AI steps with an Agent Framework agent.
+
+    Each AI step's instructions become the agent's instructions and the run description
+    its one message, so a note or gate step is a framework agent inside a framework
+    workflow. The agent has no tools and no session: whatever the run description says,
+    the model can only answer. Without `client`, each call wraps the builder's current
+    Azure OpenAI client, so a refreshed sign-in is picked up.
+    """
+
+    def __init__(self, client: SupportsChatGetResponse | None = None) -> None:
+        self._client = client
 
     async def complete(self, system: str, user: str, *, as_json: bool = False) -> str:
-        return await chat_completion(
-            system,
-            user,
-            temperature=STEP_TEMPERATURE,
-            response_format={"type": "json_object"} if as_json else None,
-        )
+        client = self._client or step_chat_client()
+        agent = Agent(client, instructions=system, name=STEP_AGENT_NAME)
+        options = ChatOptions(temperature=STEP_TEMPERATURE)
+        if as_json:
+            options["response_format"] = {"type": "json_object"}
+        response = await agent.run(user, options=options)
+        if not response.text:
+            # A content filter or an empty completion; the steps report it as a failure
+            raise RuntimeError("the model returned no text")
+        return response.text
 
 
 async def edit_with_chat(current: dict[str, Any], prompt: str) -> dict[str, Any]:
@@ -226,7 +250,7 @@ def build_hosted(
         demo=demo,
         notifier=notifier_from_environment(),
         definitions=definitions,
-        model=BuilderModel() if model_configured else None,
+        model=AgentModel() if model_configured else None,
         editor=edit_with_chat if model_configured else None,
     )
     token = secrets.token_urlsafe(32)

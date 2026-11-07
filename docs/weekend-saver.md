@@ -131,7 +131,10 @@ Rules that an edit cannot break (it is refused, with the reasons, and nothing is
 - If the saved definition is broken (for example edited by hand), enable runs use the
   default workflow and say so in a note; disable runs do not start.
 
-AI steps and chat edits use the Azure OpenAI deployment from `backend/.env`. Without
+AI steps and chat edits use the Azure OpenAI deployment from `backend/.env`. Each AI
+step runs as an Agent Framework `Agent` whose instructions are the step's instructions,
+on the framework's chat client over the builder's signed-in Azure OpenAI client, so a
+note or gate is a framework agent inside the framework workflow. Without
 `AZURE_OPENAI_ENDPOINT` they say so at once: note steps leave a note that no model is
 configured, gates stop disable runs, and chat edits are unavailable (JSON edits still
 work). A step placed before `approval` runs twice in an approved run, because the plan

@@ -4,12 +4,16 @@ import time
 from urllib.parse import urlsplit
 
 import pytest
+from agent_framework import BaseChatClient, ChatResponse, Message
+from agent_framework.openai import OpenAIChatCompletionClient
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import llm_client
 import main
 import orchestrator
 import weekend_saver_host
+from config import AZURE_OPENAI_DEPLOYMENT
 from tests.test_custom_definition import summary_before_report
 from weekend_saver.custom.definition import default_definition, definition_to_dict
 from weekend_saver.custom.guidance import edit_guidance
@@ -191,28 +195,70 @@ def test_a_chat_edit_from_the_page_is_validated_and_saved(client, monkeypatch):
     assert "summary" in names
 
 
-async def test_ai_steps_use_the_builders_model(monkeypatch):
-    seen: list[tuple[str, str, float, dict | None]] = []
+class RecordingChatClient(BaseChatClient):
+    """An Agent Framework chat client that records what the agent sends it."""
 
-    async def fake_completion(
-        system: str, user: str, *, temperature: float, response_format: dict | None
-    ) -> str:
-        seen.append((system, user, temperature, response_format))
-        return "All quiet."
+    def __init__(self, answer: str) -> None:
+        super().__init__()
+        self._answer = answer
+        self.calls: list[tuple[list[tuple[str, str]], dict]] = []
 
-    monkeypatch.setattr(weekend_saver_host, "chat_completion", fake_completion)
-    model = weekend_saver_host.BuilderModel()
+    async def _inner_get_response(self, *, messages, stream, options, **kwargs):
+        sent = [(str(message.role), message.text) for message in messages]
+        watched = ("instructions", "temperature", "response_format", "tools")
+        asked = {key: options.get(key) for key in watched}
+        self.calls.append((sent, asked))
+        return ChatResponse(messages=Message("assistant", [self._answer]))
+
+
+async def test_ai_steps_are_agent_framework_agents():
+    client = RecordingChatClient("All quiet.")
+    model = weekend_saver_host.AgentModel(client)
 
     answer = await model.complete("Summarize.", "Run: disable.")
     await model.complete("Decide.", "Run: disable.", as_json=True)
 
     temperature = weekend_saver_host.STEP_TEMPERATURE
     assert answer == "All quiet."
-    assert seen == [
-        ("Summarize.", "Run: disable.", temperature, None),
+    # The step's instructions are the agent's instructions; the run description is its
+    # input; no tools, so a resource name in that description cannot make anything run
+    assert client.calls == [
+        (
+            [("user", "Run: disable.")],
+            {
+                "instructions": "Summarize.",
+                "temperature": temperature,
+                "response_format": None,
+                "tools": None,
+            },
+        ),
         # Gates ask for JSON, so the model cannot wrap its verdict in prose
-        ("Decide.", "Run: disable.", temperature, {"type": "json_object"}),
+        (
+            [("user", "Run: disable.")],
+            {
+                "instructions": "Decide.",
+                "temperature": temperature,
+                "response_format": {"type": "json_object"},
+                "tools": None,
+            },
+        ),
     ]
+
+
+async def test_an_empty_answer_is_a_failure_not_a_blank_note():
+    model = weekend_saver_host.AgentModel(RecordingChatClient(""))
+
+    with pytest.raises(RuntimeError, match="no text"):
+        await model.complete("Summarize.", "Run: disable.")
+
+
+def test_ai_steps_run_on_the_builders_azure_openai_deployment():
+    client = weekend_saver_host.step_chat_client()
+
+    assert isinstance(client, OpenAIChatCompletionClient)
+    assert client.model == AZURE_OPENAI_DEPLOYMENT
+    # The same signed-in client the builder's chat uses, so one sign-in covers both
+    assert client.client is llm_client.get_client()
 
 
 def test_without_a_configured_model_chat_edits_and_ai_steps_are_switched_off(tmp_path):

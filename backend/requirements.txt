@@ -6,11 +6,13 @@ python-dotenv>=1.0,<2
 pyyaml>=6.0,<7
 
 # Azure OpenAI
-openai>=2.20,<3
+openai>=2.25,<3
 azure-identity>=1.20,<2
 
 # Weekend Saver workflow (real Agent Framework runs against Azure)
-agent-framework-core>=1.13,<2
+agent-framework-core>=1.24,<2
+# Agent Framework chat client for the workflow's AI steps (Azure OpenAI through it)
+agent-framework-openai>=1.18,<2
 azure-mgmt-compute>=33.0
 azure-mgmt-containerservice>=31.0
 azure-mgmt-web>=7.3
